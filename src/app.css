@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --color-surface-0: 255 255 255;
+    --color-surface-1: 248 249 250;
+    --color-surface-2: 233 236 239;
+    --color-surface-3: 222 226 230;
+    --color-primary: 79 70 229;
+    --color-primary-hover: 67 56 202;
+    --color-text: 26 26 46;
+    --color-text-muted: 107 114 128;
+    --color-border: 209 213 219;
+    --color-diff-added: 212 237 218;
+    --color-diff-removed: 248 215 218;
+    --color-diff-modified: 255 243 205;
+}
+
+.dark {
+    --color-surface-0: 15 15 26;
+    --color-surface-1: 26 26 46;
+    --color-surface-2: 37 37 62;
+    --color-surface-3: 51 51 90;
+    --color-primary: 129 140 248;
+    --color-primary-hover: 99 102 241;
+    --color-text: 229 231 235;
+    --color-text-muted: 156 163 175;
+    --color-border: 55 65 81;
+    --color-diff-added: 26 58 42;
+    --color-diff-removed: 58 26 26;
+    --color-diff-modified: 58 58 26;
+}
+
+html, body, #app {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+    background-color: rgb(var(--color-surface-0));
+    color: rgb(var(--color-text));
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* Standardize scrollbar size for the dual-scrollbar table trick */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--color-border)) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--color-border));
+    border-radius: 4px;
+}
+
+/* View Transitions — search bar morph */
+::view-transition-old(global-search),
+::view-transition-new(global-search) {
+    /* Let the browser animate both size and position naturally */
+    animation-duration: 350ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+/* Suppress the default full-page cross-fade; let only named elements animate */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}

@@ -1,0 +1,4 @@
+[submodule "public/latest"]
+	path = public/latest
+	url = https://github.com/BitCraftToolBox/BitCraft_GameData.git
+	branch = cereal/cs

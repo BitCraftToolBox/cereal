@@ -1,0 +1,45 @@
+{
+  "name": "cereal",
+  "version": "0.1.0",
+  "description": "BitCraft game data browser",
+  "type": "module",
+  "scripts": {
+    "dev": "vinxi dev",
+    "build": "vinxi build",
+    "preview": "vinxi build && wrangler pages dev dist",
+    "deploy": "wrangler pages deploy dist",
+    "gen-defs": "tsx scripts/generate-defs.ts"
+  },
+  "dependencies": {
+    "@kobalte/core": "^0.13.11",
+    "@kobalte/tailwindcss": "^0.9.0",
+    "@solidjs/meta": "^0.29.4",
+    "@solidjs/router": "^0.16.1",
+    "@solidjs/start": "^1.3.2",
+    "@tanstack/solid-table": "^8.21.3",
+    "@types/d3-drag": "^3.0.7",
+    "@types/d3-force": "^3.0.10",
+    "@types/d3-selection": "^3.0.11",
+    "@types/d3-zoom": "^3.0.8",
+    "d3-drag": "^3.0.0",
+    "d3-force": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0",
+    "solid-js": "^1.9.12",
+    "vinxi": "^0.5.11",
+    "wrangler": "^4.83.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^3.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vite": "^6.4.2"
+  },
+  "overrides": {
+    "vite": "^6.4.2"
+  },
+  "private": true
+}

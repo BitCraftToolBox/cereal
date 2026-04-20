@@ -1,0 +1,6 @@
+.idea/
+.vinxi/
+.wrangler/
+node_modules/
+dist/
+.DS_Store
