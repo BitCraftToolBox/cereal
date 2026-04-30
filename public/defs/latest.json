@@ -1,5 +1,8 @@
 {
   "hash": "latest",
+  "label": "Latest (local)",
+  "description": "",
+  "date": "2026-04-30T13:22:58.043Z",
   "enums": [
     {
       "name": "AlertType",
@@ -884,7 +887,7 @@
       "name": "ability_unlock_desc",
       "primaryKey": "id",
       "searchFields": [],
-      "rowCount": 26,
+      "rowCount": 28,
       "columns": [
         "id",
         "ability_type_enum_id",
@@ -1042,7 +1045,7 @@
       "name": "building_claim_desc",
       "primaryKey": "building_id",
       "searchFields": [],
-      "rowCount": 49,
+      "rowCount": 53,
       "columns": [
         "building_id",
         "claim_type",
@@ -1066,7 +1069,7 @@
         "name",
         "description"
       ],
-      "rowCount": 896,
+      "rowCount": 934,
       "columns": [
         "id",
         "functions",
@@ -1111,7 +1114,7 @@
       "name": "building_function_type_mapping_desc",
       "primaryKey": "type_id",
       "searchFields": [],
-      "rowCount": 57,
+      "rowCount": 58,
       "columns": [
         "type_id",
         "desc_ids"
@@ -1164,7 +1167,7 @@
       "searchFields": [
         "name"
       ],
-      "rowCount": 69,
+      "rowCount": 70,
       "columns": [
         "id",
         "name",
@@ -1320,7 +1323,7 @@
       "name": "clothing_desc",
       "primaryKey": "item_id",
       "searchFields": [],
-      "rowCount": 315,
+      "rowCount": 319,
       "columns": [
         "item_id",
         "mask"
@@ -1343,7 +1346,7 @@
         "description",
         "tag"
       ],
-      "rowCount": 2363,
+      "rowCount": 2388,
       "columns": [
         "id",
         "name",
@@ -1459,7 +1462,7 @@
       "searchFields": [
         "name"
       ],
-      "rowCount": 644,
+      "rowCount": 682,
       "columns": [
         "id",
         "name",
@@ -1519,7 +1522,7 @@
       "searchFields": [
         "name"
       ],
-      "rowCount": 7428,
+      "rowCount": 7450,
       "columns": [
         "id",
         "name",
@@ -1561,7 +1564,7 @@
       "name": "deconstruction_recipe_desc",
       "primaryKey": "id",
       "searchFields": [],
-      "rowCount": 580,
+      "rowCount": 615,
       "columns": [
         "id",
         "time_requirement",
@@ -1806,7 +1809,7 @@
       "name": "enemy_ai_params_desc",
       "primaryKey": "id",
       "searchFields": [],
-      "rowCount": 109,
+      "rowCount": 110,
       "columns": [
         "id",
         "enemy_type",
@@ -1944,7 +1947,7 @@
       "name": "equipment_desc",
       "primaryKey": "item_id",
       "searchFields": [],
-      "rowCount": 2062,
+      "rowCount": 2080,
       "columns": [
         "item_id",
         "slots",
@@ -1987,7 +1990,7 @@
       "name": "extraction_recipe_desc",
       "primaryKey": "id",
       "searchFields": [],
-      "rowCount": 449,
+      "rowCount": 452,
       "columns": [
         "id",
         "resource_id",
@@ -2285,7 +2288,7 @@
         "description",
         "tag"
       ],
-      "rowCount": 7229,
+      "rowCount": 7281,
       "columns": [
         "id",
         "name",
@@ -2342,7 +2345,7 @@
       "searchFields": [
         "tag"
       ],
-      "rowCount": 399,
+      "rowCount": 403,
       "columns": [
         "item_id",
         "scroll_type",
@@ -2586,7 +2589,7 @@
         "name",
         "description"
       ],
-      "rowCount": 108,
+      "rowCount": 113,
       "columns": [
         "id",
         "name",
@@ -2699,7 +2702,7 @@
         "name",
         "description"
       ],
-      "rowCount": 59,
+      "rowCount": 74,
       "columns": [
         "id",
         "name",
@@ -2757,7 +2760,7 @@
         "name",
         "description"
       ],
-      "rowCount": 26,
+      "rowCount": 28,
       "columns": [
         "id",
         "name",
@@ -2809,7 +2812,7 @@
       "searchFields": [
         "name"
       ],
-      "rowCount": 124,
+      "rowCount": 126,
       "columns": [
         "id",
         "name",
@@ -2838,7 +2841,7 @@
       "name": "quest_drop_desc",
       "primaryKey": "id",
       "searchFields": [],
-      "rowCount": 15,
+      "rowCount": 16,
       "columns": [
         "id",
         "extraction_id",
@@ -2864,7 +2867,7 @@
       "searchFields": [
         "name"
       ],
-      "rowCount": 668,
+      "rowCount": 692,
       "columns": [
         "id",
         "chain_desc_id",
@@ -2898,7 +2901,7 @@
       "name": "resource_clump_desc",
       "primaryKey": "id",
       "searchFields": [],
-      "rowCount": 506,
+      "rowCount": 509,
       "columns": [
         "id",
         "resource_id",
@@ -2919,7 +2922,7 @@
         "name",
         "tag"
       ],
-      "rowCount": 507,
+      "rowCount": 510,
       "columns": [
         "id",
         "name",
@@ -2941,7 +2944,8 @@
         "enemy_params_id",
         "scheduled_respawn_time",
         "not_respawning",
-        "show_time_left"
+        "show_time_left",
+        "on_destroy_yield_resource_chance"
       ],
       "isPublic": true,
       "enumColumns": [
@@ -3009,7 +3013,7 @@
       "searchFields": [
         "name"
       ],
-      "rowCount": 469,
+      "rowCount": 473,
       "columns": [
         "id",
         "name"
@@ -3179,7 +3183,7 @@
       "name": "traveler_trade_order_desc",
       "primaryKey": "id",
       "searchFields": [],
-      "rowCount": 121,
+      "rowCount": 124,
       "columns": [
         "id",
         "starting_stock",
