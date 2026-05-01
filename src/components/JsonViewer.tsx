@@ -147,16 +147,21 @@ function JsonNode(props: JsonNodeProps) {
         return variants[props.value] ?? null;
     });
 
-    const fkAnnotation = (): JSX.Element => {
+    const fkTarget = createMemo(() => {
         const target = resolvedTargetTable();
-        const variant = enumVariant();
         const hasFk = target && !(props.value === null || props.value === undefined || props.value === 0);
-        if (!hasFk && !variant) return <></>;
+        return hasFk ? target : null;
+    });
+
+    const fkAnnotation = (): JSX.Element => {
+        const target = fkTarget();
+        const variant = enumVariant();
+        if (!target && !variant) return <></>;
         return (
             <span class="select-none">
                 {" "}
                 <span class="text-text-muted">{"// "}</span>
-                <Show when={hasFk}>
+                <Show when={target}>
                     <A
                       href={`/table/${target}/${encodeURIComponent(resolvedId())}`}
                       class="text-text-muted hover:text-primary transition-colors"
@@ -167,7 +172,7 @@ function JsonNode(props: JsonNodeProps) {
                         </Show>
                     </A>
                 </Show>
-                <Show when={!hasFk && variant}>
+                <Show when={!target && variant}>
                   <span class="text-text-muted italic">{variant}</span>
                 </Show>
             </span>
@@ -181,7 +186,15 @@ function JsonNode(props: JsonNodeProps) {
                 <>
                     <Show
                         when={props.spriteFields?.has(props.fieldPath) && typeof props.value === "string" && props.value.length > 1}
-                        fallback={<JsonPrimitive value={props.value}/>}
+                        fallback={fkTarget() ?
+                            <A
+                                href={`/table/${fkTarget()}/${encodeURIComponent(resolvedId())}`}
+                                title={`Go to ${fkTarget()} #${resolvedId()}`}
+                            >
+                                <JsonPrimitive value={props.value}/>
+                            </A>
+                            : <JsonPrimitive value={props.value}/>
+                        }
                     >
                         <span class="text-green-600 dark:text-green-400">"</span>
                         <SpriteLink path={props.value as string}/>

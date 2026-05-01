@@ -85,10 +85,6 @@ export function Navbar() {
         e.preventDefault();
         const q = searchQuery().trim();
         if (!q) return;
-        if (suggestions().length === 1) {
-            commitSuggestion(suggestions()[0]);
-            return;
-        }
         setDropdownOpen(false);
         vt(() => navigate(`/search?q=${encodeURIComponent(q)}`));
     };
