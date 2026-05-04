@@ -1,6 +1,6 @@
 {
   "name": "cereal",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "BitCraft game data browser",
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "build": "vinxi build",
     "preview": "vinxi build && wrangler pages dev dist",
     "deploy": "wrangler pages deploy dist",
-    "gen-defs": "tsx scripts/generate-defs.ts"
+    "gen-defs": "tsx scripts/generate-defs.ts",
+    "update-versions": "tsx scripts/update-versions.ts"
   },
   "dependencies": {
     "@kobalte/core": "^0.13.11",

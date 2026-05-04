@@ -1,6 +1,6 @@
 import {createSignal, onCleanup, Show} from "solid-js";
 import {Portal} from "solid-js/web";
-import {SPRITE_CDN_BASE} from "~/lib/schema";
+import {SPRITE_CDN_BASE} from "~/lib/constants";
 
 /** All URL variants for a path with bracket notation, base first then each quantity tier. */
 function spriteVariants(path: string): string[] {

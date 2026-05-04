@@ -1,16 +1,19 @@
 import {A, useIsRouting, useNavigate} from "@solidjs/router";
 import {createMemo, createSignal, For, onCleanup, onMount, Show} from "solid-js";
 import {useTheme} from "~/lib/theme";
-import {isStaticTable, useData} from "~/lib/data";
+import {useData, useVersions} from "~/lib/data";
 import {useNavHistory} from "~/lib/navHistory";
 import {LoadingSpinner} from "~/components/LoadingSpinner";
-import {searchTableNames} from "~/lib/search";
+import {searchTableNames, searchWithIndex, type ObjectMatch, type TableMatch, type SearchResult} from "~/lib/search";
 
-const MAX_DROPDOWN = 8;
+const MAX_TABLE_SUGGESTIONS = 3;
+const MAX_OBJECT_SUGGESTIONS = 15;
+const OBJECT_SCORE_CUTOFF = 3.5;
 
 export function Navbar() {
     const {isDark, toggle} = useTheme();
     const data = useData();
+    const versions = useVersions();
     const nav = useNavHistory();
     const navigate = useNavigate();
     const isRouting = useIsRouting();
@@ -21,17 +24,35 @@ export function Navbar() {
     let inputRef: HTMLInputElement | undefined;
     let dropdownRef: HTMLUListElement | undefined;
 
+    const anyLoading = () => {
+        return data.tableIndex.loading || data.searchIndex.loading || data.schema.loading || isRouting();
+    }
+
     const getInput = () => {
         if (inputRef && document.contains(inputRef)) return inputRef;
         return document.querySelector<HTMLInputElement>("nav input[type='search']") ?? undefined;
     };
 
-    const suggestions = createMemo(() => {
-        const q = searchQuery().trim().toLowerCase().replace(/\s+/g, "_");
+    const suggestions = createMemo((): SearchResult[] => {
+        const q = searchQuery().trim();
         if (!q || !data.tableIndex()) return [];
-        return searchTableNames(q, data.tableIndex() ?? [])
-            .slice(0, MAX_DROPDOWN)
-            .map(t => t.tableName);
+
+        const tableMatches: TableMatch[] = searchTableNames(q, data.tableIndex() ?? [])
+            .slice(0, MAX_TABLE_SUGGESTIONS);
+
+        const idx = data.searchIndex();
+        let objectMatches: ObjectMatch[] = [];
+        if (idx) {
+            const results = searchWithIndex(q, idx, MAX_OBJECT_SUGGESTIONS, OBJECT_SCORE_CUTOFF);
+            // Flatten all object matches across tables, sort by score, take top N
+            for (const matches of results.objects.values()) {
+                objectMatches.push(...matches);
+            }
+            objectMatches.sort((a, b) => a.score - b.score);
+            objectMatches = objectMatches.slice(0, MAX_OBJECT_SUGGESTIONS);
+        }
+
+        return [...tableMatches, ...objectMatches];
     });
 
     const hasSuggestions = () => dropdownOpen() && suggestions().length > 0;
@@ -42,12 +63,19 @@ export function Navbar() {
         } else fn();
     };
 
-    const commitSuggestion = (name: string) => {
+    const commitSuggestion = (result: SearchResult) => {
         setSearchQuery("");
         setDropdownOpen(false);
         setActiveIndex(-1);
-        nav.push({path: `/table/${name}`, label: `⊞ ${name}`});
-        vt(() => navigate(`/table/${name}`));
+        if (result.kind === "table") {
+            vt(() => navigate(`/table/${result.tableName}`));
+        } else {
+            const path = `/table/${result.tableName}/${encodeURIComponent(String(result.primaryKey))}`;
+            const label = result.displayValue && result.displayValue !== String(result.primaryKey)
+                ? `▣ ${result.displayValue}`
+                : `▣ ${result.tableName} #${result.primaryKey}`;
+            vt(() => navigate(path));
+        }
     };
 
     const handleInput = (e: InputEvent) => {
@@ -64,6 +92,9 @@ export function Navbar() {
                 getInput()?.blur();
                 return;
             }
+        } else if (e.key === "Enter" && e.shiftKey) {
+            handleSearch(e);
+            return;
         }
         if (!hasSuggestions()) return;
         if (e.key === "ArrowDown") {
@@ -141,60 +172,93 @@ export function Navbar() {
             <Show when={hasSuggestions()}>
                 <ul
                     ref={dropdownRef}
-                    class="absolute top-full mt-1 left-0 right-0 bg-surface-1 border border-border rounded-md shadow-lg z-50 py-1 max-h-72 overflow-y-auto"
+                    class="absolute top-full mt-1 left-0 right-0 bg-surface-1 border border-border rounded-md shadow-lg z-50 py-1 max-h-96 overflow-y-auto min-w-64"
                     role="listbox"
                 >
                     <For each={suggestions()}>
-                        {(name, i) => (
-                            <li
-                                role="option"
-                                aria-selected={activeIndex() === i()}
-                                class="px-3 py-1.5 text-sm font-mono cursor-pointer transition-colors"
-                                classList={{
-                                    "bg-primary text-white": activeIndex() === i(),
-                                    "hover:bg-surface-2": activeIndex() !== i(),
-                                }}
-                                onPointerDown={(e) => {
-                                    e.preventDefault();
-                                    commitSuggestion(name);
-                                }}
-                                onMouseEnter={() => setActiveIndex(i())}
-                            >
-                                {(() => {
-                                    const q = searchQuery().trim().toLowerCase().replace(/\s+/g, "_");
-                                    if (!q) return name;
-                                    const qNorm = q.replace(/_/g, "");
-                                    const nameNorm = name.replace(/_/g, "");
-                                    const matchIdx = nameNorm.indexOf(qNorm);
-                                    if (matchIdx < 0) return name;
-                                    let normCount = 0;
-                                    let start = -1, end = -1;
-                                    for (let i = 0; i < name.length; i++) {
-                                        if (name[i] === "_") continue;
-                                        if (normCount === matchIdx) start = i;
-                                        normCount++;
-                                        if (normCount === matchIdx + qNorm.length) {
-                                            end = i + 1;
-                                            break;
-                                        }
-                                    }
-                                    if (start < 0 || end < 0) return name;
-                                    return (
-                                        <>
-                                            {name.slice(0, start)}
-                                            <mark
-                                                class="bg-transparent font-bold text-inherit underline">{name.slice(start, end)}</mark>
-                                            {name.slice(end)}
-                                        </>
-                                    );
-                                })()}
-                            </li>
-                        )}
+                        {(result, i) => {
+                            const isActive = () => activeIndex() === i();
+                            return (
+                                <li
+                                    role="option"
+                                    aria-selected={isActive()}
+                                    class="px-3 py-1.5 text-sm cursor-pointer transition-colors flex flex-col gap-0.5"
+                                    classList={{
+                                        "bg-primary text-white": isActive(),
+                                        "hover:bg-surface-2": !isActive(),
+                                    }}
+                                    onPointerDown={(e) => {
+                                        e.preventDefault();
+                                        commitSuggestion(result);
+                                    }}
+                                    onMouseEnter={() => setActiveIndex(i())}
+                                >
+                                    <Show when={result.kind === "table"}>
+                                        {(() => {
+                                            const t = result as TableMatch;
+                                            const q = searchQuery().trim().toLowerCase();
+                                            const qNorm = q.replace(/[\s_]+/g, "");
+                                            const name = t.tableName;
+                                            const nameNorm = name.replace(/_/g, "");
+                                            const matchIdx = nameNorm.indexOf(qNorm);
+                                            let highlighted: any = name;
+                                            if (matchIdx >= 0) {
+                                                let normCount = 0, start = -1, end = -1;
+                                                for (let ci = 0; ci < name.length; ci++) {
+                                                    if (name[ci] === "_") continue;
+                                                    if (normCount === matchIdx) start = ci;
+                                                    normCount++;
+                                                    if (normCount === matchIdx + qNorm.length) { end = ci + 1; break; }
+                                                }
+                                                if (start >= 0 && end >= 0) {
+                                                    highlighted = (
+                                                        <>
+                                                            {name.slice(0, start)}
+                                                            <mark class="bg-transparent font-bold text-inherit underline">{name.slice(start, end)}</mark>
+                                                            {name.slice(end)}
+                                                        </>
+                                                    );
+                                                }
+                                            }
+                                            return (
+                                                <span class="font-mono">
+                                                    <span class="opacity-60 text-xs">table: </span>{highlighted}
+                                                </span>
+                                            );
+                                        })()}
+                                    </Show>
+                                    <Show when={result.kind === "object"}>
+                                        {(() => {
+                                            const o = result as ObjectMatch;
+                                            const pk = String(o.primaryKey);
+                                            const hasName = o.displayValue && o.displayValue !== pk;
+                                            const showMatchField = o.matchField !== "name" && o.matchField !== "id";
+                                            const showPk = o.matchValue === pk;
+                                            return (
+                                                <>
+                                                    <span class="font-mono text-xs opacity-60">{o.tableName}:</span>
+                                                    <span class="font-mono">
+                                                        {hasName ? o.displayValue : pk}
+                                                        <Show when={showMatchField || showPk}>
+                                                            <span class="opacity-60 text-xs ml-1.5">
+                                                                ({showMatchField
+                                                                    ? <>{o.matchField}: {o.matchValue}</>
+                                                                    : <>pk: {pk}</>
+                                                                })
+                                                            </span>
+                                                        </Show>
+                                                    </span>
+                                                </>
+                                            );
+                                        })()}
+                                    </Show>
+                                </li>
+                            );
+                        }}
                     </For>
-                    <Show
-                        when={(data.tableIndex() ?? []).filter(t => isStaticTable(t.name) && t.name.includes(searchQuery().trim().toLowerCase().replace(/\s+/g, "_"))).length > MAX_DROPDOWN}>
+                    <Show when={suggestions().length > 0}>
                         <li class="px-3 py-1 text-xs text-text-muted border-t border-border mt-1 pt-1">
-                            Press Enter to search all results
+                            Press Shift+Enter to see full search results
                         </li>
                     </Show>
                 </ul>
@@ -202,16 +266,37 @@ export function Navbar() {
         </form>
     );
 
+    function selectVersion(tag: string) {
+        nav.updateTop(undefined, undefined, tag)
+        versions.setCurrentTag(tag);
+    }
+
+    function handleSelectKey(e: KeyboardEvent, currentTag: string) {
+        const currentIndex = versions.versions()?.findIndex(v => v.tag === currentTag);
+        if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            if (currentIndex === undefined || currentIndex < 0 || currentIndex >= (versions.versions()?.length ?? 0) - 1) return;
+            const target = versions.versions()?.[currentIndex + 1]?.tag;
+            if (target) selectVersion(target);
+        } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            if (currentIndex === undefined || currentIndex <= 0) return;
+            const target = versions.versions()?.[currentIndex - 1]?.tag;
+            if (target) selectVersion(target);
+        }
+    }
+
     const VersionSelect = () => (
         <select
-            value={data.version()}
-            onChange={(e) => data.setVersion(e.currentTarget.value)}
-            class="px-2 py-1 rounded-md bg-surface-2 border border-border text-text text-sm w-full sm:w-auto"
+            value={versions.currentTag()}
+            onKeyDown={(e) => handleSelectKey(e, e.currentTarget?.value)}
+            onChange={(e) => selectVersion(e.currentTarget.value)}
+            class="px-2 py-1 rounded-md bg-surface-2 border border-border text-text text-sm w-full sm:w-auto focus:outline-none focus:ring-1 focus:ring-primary"
             aria-label="Data version"
         >
-            <Show when={data.versions()} fallback={<option value="latest">Loading…</option>}>
-                <For each={data.versions()}>
-                    {(v) => <option value={v.hash}>{v.label}</option>}
+            <Show when={versions.versions()} fallback={<option value="latest">Loading…</option>}>
+                <For each={versions.versions()}>
+                    {(v) => <option value={v.tag}>{v.tag + (v.label ? " (" + v.label + ")" : "") }</option>}
                 </For>
             </Show>
         </select>
@@ -246,19 +331,26 @@ export function Navbar() {
                 </div>
 
                 {/* Global loading indicator */}
-                <Show when={data.tableIndex.loading || isRouting()}>
+                <Show when={anyLoading()} fallback={<div class="w-4 h-4"></div>}>
                     <LoadingSpinner size="sm" label="Loading data…" class="shrink-0 hidden sm:flex"/>
                 </Show>
 
                 {/* Desktop: version + dark mode (hidden on mobile) */}
                 <div class="hidden sm:flex items-center gap-2 ml-auto shrink-0">
                     <VersionSelect/>
+                    <A
+                        href={"/versions"}
+                        class="px-2 py-1 text-sm text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+                        title="View all versions"
+                    >
+                        All versions
+                    </A>
                     <DarkModeButton/>
                 </div>
 
                 {/* Mobile: loading + hamburger button */}
                 <div class="flex items-center gap-2 ml-auto sm:hidden">
-                    <Show when={data.tableIndex.loading || isRouting()}>
+                    <Show when={anyLoading()}>
                         <LoadingSpinner size="sm" label="Loading data…" class="shrink-0"/>
                     </Show>
                     <button
@@ -293,6 +385,13 @@ export function Navbar() {
                     {SearchForm("w-full")}
                     <div class="flex items-center justify-between gap-2">
                         <VersionSelect/>
+                        <A
+                            href={"/versions"}
+                            class="px-2 py-1 text-sm text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+                            onClick={() => { setMenuOpen(false); }}
+                        >
+                            All versions
+                        </A>
                         <DarkModeButton/>
                     </div>
                 </div>

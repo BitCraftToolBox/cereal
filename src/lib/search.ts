@@ -1,5 +1,6 @@
-import type {ResolvedTableMeta} from "./data";
-import {isStaticTable, TableIndex} from "./data";
+import type {TableIndex} from "./data";
+import {isStaticTable} from "./data";
+import type {CompactSearchEntry, SearchIndex} from "./schema";
 
 export type TableCategory = "static" | "hidden" | "nonStatic";
 
@@ -29,10 +30,6 @@ export interface GroupedResults {
     objects: Map<string, ObjectMatch[]>;
     /** Total matches per table (before maxPerTable slice) */
     totalPerTable: Map<string, number>;
-    /** How many static public tables were searched (had cached rows) */
-    tablesSearched: number;
-    /** How many static public tables were skipped (not yet cached) */
-    tablesSkipped: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,14 +206,11 @@ export function searchTableNames(
 }
 
 /**
- * Search across cached table rows.
- * PK fields are matched exactly (case-insensitive string comparison).
- * Display/search fields are matched fuzzily up to scoreCutoff.
+ * Search using a pre-built SearchIndex (fast path — no table row loading required).
  */
-export function searchCachedTables(
+export function searchWithIndex(
     query: string,
-    tables: Map<string, { meta: ResolvedTableMeta; rows: Record<string, unknown>[] }>,
-    allStaticPublicTableNames: string[],
+    index: SearchIndex,
     maxPerTable = 5,
     scoreCutoff = 9,
 ): GroupedResults {
@@ -224,80 +218,58 @@ export function searchCachedTables(
     const qLower = q.toLowerCase();
     const objects = new Map<string, ObjectMatch[]>();
     const totalPerTable = new Map<string, number>();
-    let tablesSearched = 0;
-    let tablesSkipped = 0;
 
-    for (const name of allStaticPublicTableNames) {
-        const entry = tables.get(name);
-        if (!entry) {
-            tablesSkipped++;
-            continue;
-        }
-        tablesSearched++;
-        const {meta, rows} = entry;
-        const matches: ObjectMatch[] = [];
-
-        for (const row of rows) {
-            const pkVal = meta.primaryKey ? String(row[meta.primaryKey] ?? "") : "";
-            const display = meta.displayField ? String(row[meta.displayField] ?? pkVal) : pkVal;
+    for (const [tableName, entries] of Object.entries(index.entries)) {
+        for (const raw of entries as CompactSearchEntry[]) {
+            const pkRaw = typeof raw === "string" || typeof raw === "number" ? raw : raw.pk;
+            const pk = String(pkRaw);
+            const n = typeof raw === "object" && raw.n != null ? raw.n : pk;
+            const f: [string, string][] = typeof raw === "object" && raw.f != null ? raw.f : [];
 
             // Exact PK match
-            if (meta.primaryKey && pkVal.toLowerCase() === qLower) {
-                matches.push({
-                    kind: "object",
-                    tableName: name,
-                    primaryKey: row[meta.primaryKey!],
-                    displayValue: display,
-                    matchField: meta.primaryKey,
-                    matchValue: pkVal,
-                    score: -1,
-                });
+            if (pk.toLowerCase() === qLower) {
+                const list = objects.get(tableName) ?? [];
+                list.push({kind: "object", tableName, primaryKey: pk, displayValue: n, matchField: "id", matchValue: pk, score: -1});
+                objects.set(tableName, list);
                 continue;
             }
 
-            // Fuzzy match against display + search fields
-            const searchFields = [...new Set([
-                ...(meta.displayField ? [meta.displayField] : []),
-                ...meta.searchFields,
-            ])];
-
+            // Fuzzy match against display name and search fields
             let bestScore: number | null = null;
             let bestField = "";
             let bestVal = "";
 
-            for (const field of searchFields) {
-                const val = row[field];
-                if (val == null) continue;
-                const str = String(val);
-                const score = scoreMatch(str, q);
+            const nameScore = scoreMatch(n, q);
+            if (nameScore !== null && nameScore <= scoreCutoff) {
+                bestScore = nameScore;
+                bestField = "name";
+                bestVal = n;
+            }
+
+            for (const [field, val] of f) {
+                const score = scoreMatch(val, q);
                 if (score !== null && score <= scoreCutoff && (bestScore === null || score < bestScore)) {
                     bestScore = score;
                     bestField = field;
-                    bestVal = str;
+                    bestVal = val;
                 }
             }
 
             if (bestScore !== null) {
-                matches.push({
-                    kind: "object",
-                    tableName: name,
-                    primaryKey: meta.primaryKey ? row[meta.primaryKey] : undefined,
-                    displayValue: display,
-                    matchField: bestField,
-                    matchValue: bestVal,
-                    score: bestScore,
-                });
+                const list = objects.get(tableName) ?? [];
+                list.push({kind: "object", tableName, primaryKey: pk, displayValue: n, matchField: bestField, matchValue: bestVal, score: bestScore});
+                objects.set(tableName, list);
             }
-        }
-
-        if (matches.length > 0) {
-            matches.sort((a, b) => a.score - b.score);
-            totalPerTable.set(name, matches.length);
-            objects.set(name, matches.slice(0, maxPerTable));
         }
     }
 
-    const sorted = new Map([...objects.entries()].sort((a, b) => a[1][0].score - b[1][0].score));
+    // Sort within each table, count totals, slice to maxPerTable
+    for (const [name, matches] of objects) {
+        matches.sort((a, b) => a.score - b.score);
+        totalPerTable.set(name, matches.length);
+        objects.set(name, matches.slice(0, maxPerTable));
+    }
 
-    return {tables: [], objects: sorted, totalPerTable, tablesSearched, tablesSkipped};
+    const sorted = new Map([...objects.entries()].sort((a, b) => a[1][0].score - b[1][0].score));
+    return {tables: [], objects: sorted, totalPerTable};
 }

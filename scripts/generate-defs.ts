@@ -1,16 +1,13 @@
 /**
  * generate-defs.ts
  *
- * Standalone tool that reads data/static/*.json and data/region_schema.json,
+ * Standalone tool that reads <versionDir>/static/*.json and <versionDir>/region_schema.json,
  * computes table metadata and foreign-key mappings, and writes the results
- * to public/defs/.
- *
- * Outputs:
- *   public/defs/latest.json   - DefManifest for the current data/ directory
- *   public/defs/versions.json - Array of VersionEntry (stub for now)
+ * to <versionDir>/version_<tag>.json.
  *
  * Usage:
- *   npm run gen-defs
+ *   npm run gen-defs -- <versionDir>
+ *   e.g. npm run gen-defs -- public/data/2026-04-30
  */
 
 import fs from "node:fs";
@@ -22,19 +19,32 @@ import type {
     EnumDef,
     ForeignKeyMapping,
     ProductElement,
+    SearchIndex,
     SpacetimeDBSchema,
     TableMeta,
+    VersionEntry,
 } from "../src/lib/schema";
 import {getNestedValue} from "../src/lib/schema";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
-const DATA_DIR = path.join(ROOT, "public", "latest", "static");
-const SCHEMA_FILE = path.join(ROOT, "public", "latest", "region_schema.json");
-const DEFS_DIR = path.join(ROOT, "public", "defs");
+// Accept a version folder path as the first argument
+const versionArg = process.argv[2];
+if (!versionArg) {
+    console.error("Usage: tsx scripts/generate-defs.ts <versionDir>");
+    console.error("  e.g. tsx scripts/generate-defs.ts public/data/2026-04-30");
+    process.exit(1);
+}
+const VERSION_DIR = path.resolve(process.cwd(), versionArg);
+const VERSION_TAG = path.basename(VERSION_DIR);
+const DATA_DIR = path.join(VERSION_DIR, "static");
+const SCHEMA_FILE = path.join(VERSION_DIR, "region_schema.json");
 
-// metadata part of the definitions
-type VersionEntry = Omit<DefManifest, "tables" | "enums" | "foreignKeys">;
+if (!fs.existsSync(VERSION_DIR)) {
+    console.error(`Version directory not found: ${VERSION_DIR}`);
+    process.exit(1);
+}
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ANNOTATIONS = path.resolve(__dirname, "version_annotations.json");
 
 // ---------------------------------------------------------------------------
 // 1. Parse region_schema.json
@@ -339,7 +349,8 @@ function detectSearchFields(rows: Record<string, unknown>[]): string[] {
             !lk.includes("name") &&
             !lk.includes("description") &&
             !lk.includes("desc") &&
-            !lk.includes("tag")
+            !lk.includes("tag") &&
+            !lk.includes("text")
         ) return false;
 
         // Exclude asset_name / asset_names columns
@@ -1235,31 +1246,92 @@ console.log("\nDetecting foreign keys...");
 const foreignKeys = detectForeignKeys(tableData);
 console.log(`  Found ${foreignKeys.length} foreign key mappings`);
 
+
+let annotations: VersionEntry[] = [];
+if (fs.existsSync(ANNOTATIONS)) {
+    try {
+        annotations = JSON.parse(fs.readFileSync(ANNOTATIONS, "utf-8")) as VersionEntry[];
+        console.log(`Loaded ${annotations.length} version annotations`);
+    } catch (e) {
+        console.warn("Could not parse version_annotations.json, ignoring:", e);
+    }
+}
+
+const annotationsByTag = new Map<string, VersionEntry>(annotations.map((v) => [v.tag, v]));
+
 const manifest: DefManifest = {
-    hash: "latest",
-    label: "Latest (local)",
-    description: "",
-    date: new Date().toISOString(),
+    tag: VERSION_TAG,
+    label: annotationsByTag.get(VERSION_TAG)?.label,
+    description: annotationsByTag.get(VERSION_TAG)?.description,
     enums: [...globalEnumRegistry.values()].map(({name, values}): EnumDef => ({name, values})),
     tables: Object.values(tableData).map(({meta}) => meta),
     foreignKeys,
 };
 
-fs.mkdirSync(DEFS_DIR, {recursive: true});
+const outputPath = path.join(VERSION_DIR, `version_${VERSION_TAG}.json`);
+fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2), "utf-8");
+console.log(`\nWrote ${outputPath}`);
 
-const latestPath = path.join(DEFS_DIR, "latest.json");
-fs.writeFileSync(latestPath, JSON.stringify(manifest, null, 2), "utf-8");
-console.log(`\nWrote ${latestPath}`);
+// ---------------------------------------------------------------------------
+// 6. Generate search index
+// ---------------------------------------------------------------------------
+console.log("\nBuilding search index...");
+const searchEntries: Record<string, (string | number | { pk: string | number; n?: string; f?: [string, string][] })[]> = {};
+let totalEntryCount = 0;
 
-const versionsPath = path.join(DEFS_DIR, "versions.json");
-if (!fs.existsSync(versionsPath)) {
-    const versions: VersionEntry[] = [manifest].map(
-        ({hash, label, date, description}) => ({hash, label, date, description})
-    );
-    fs.writeFileSync(versionsPath, JSON.stringify(versions, null, 2), "utf-8");
-    console.log(`Wrote ${versionsPath} (stub)`);
-} else {
-    console.log(`Skipped ${versionsPath} (already exists)`);
+for (const [tableName, {meta, rows}] of Object.entries(tableData)) {
+    // Only index static, public tables that have rows
+    if (!meta.isPublic || rows.length === 0) continue;
+    if (!tableName.endsWith("_desc") && !tableName.match(/_desc_v\d+$/) && tableName !== "claim_tile_cost") continue;
+    if (!meta.primaryKey) continue;
+
+    const hasDisplay = !!meta.displayField;
+    const searchFields = meta.searchFields.filter((f) => f !== meta.displayField);
+
+    const tableEntries: (string | number | { pk: string | number; n?: string; f?: [string, string][] })[] = [];
+
+    for (const row of rows) {
+        const rawPk = row[meta.primaryKey!];
+        if (rawPk == null) continue;
+        // Keep PK as number when it is one — saves space in JSON
+        const pk = typeof rawPk === "number" ? rawPk : String(rawPk);
+
+        if (!hasDisplay && searchFields.length === 0) {
+            // Pure PK table — just store the raw pk value
+            tableEntries.push(pk);
+            continue;
+        }
+
+        const displayRaw = hasDisplay ? row[meta.displayField!] : undefined;
+        const n = displayRaw != null ? String(displayRaw) : undefined;
+
+        const fieldPairs: [string, string][] = [];
+        for (const field of searchFields) {
+            const val = row[field];
+            if (val == null || val === "") continue;
+            const str = String(val);
+            if (str.length <= 1) continue;
+            if (/^\\u[0-9a-f]{4}$/i.test(str)) continue;
+            if (/^[0-9a-f]{32,}$/i.test(str)) continue;
+            fieldPairs.push([field, str]);
+        }
+
+        const entry: { pk: string | number; n?: string; f?: [string, string][] } = {pk};
+        if (n != null) entry.n = n;
+        if (fieldPairs.length > 0) entry.f = fieldPairs;
+        tableEntries.push(entry);
+    }
+
+    if (tableEntries.length > 0) {
+        searchEntries[tableName] = tableEntries;
+        totalEntryCount += tableEntries.length;
+    }
 }
+
+const searchIndex: SearchIndex = {tag: VERSION_TAG, entries: searchEntries};
+const searchPath = path.join(VERSION_DIR, `search_${VERSION_TAG}.json`);
+fs.writeFileSync(searchPath, JSON.stringify(searchIndex), "utf-8"); // compact, no indent
+const fileSizeKb = Math.round(fs.statSync(searchPath).size / 1024);
+console.log(`Wrote ${searchPath} (${totalEntryCount} entries, ${fileSizeKb} KB)`);
 
 console.log("\nDone.");

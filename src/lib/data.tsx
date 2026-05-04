@@ -1,42 +1,39 @@
 import {
     Accessor,
     createContext,
+    createEffect,
     createMemo,
     createResource,
     createSignal,
     ParentComponent,
     Resource,
+    untrack,
     useContext,
 } from "solid-js";
+import {useLocation, useSearchParams} from "@solidjs/router";
 import {
     type AlgebraicType,
     buildTypeIndexMap,
-    DefManifest,
-    ForeignKeyMapping,
+    type DefManifest,
+    type ForeignKeyMapping,
     getColumnTypeElement,
-    SpacetimeDBSchema,
-    TableMeta,
+    type SearchIndex,
+    type SpacetimeDBSchema,
+    type TableMeta,
+    type VersionEntry,
 } from "./schema";
+import {DATA_CDN_BASE} from "./constants";
 
-// Re-export a patched TableMeta type where enumValues is the resolved string[] form
-export type ResolvedTableMeta = Omit<TableMeta, "enumValues"> & { enumValues: Record<string, string[]> };
-
-// --- Types ---
+export type ResolvedTableMeta = Omit<TableMeta, "enumValues"> & {
+    enumValues: Record<string, string[]>;
+};
 
 export interface TableIndex {
     name: string;
     meta: ResolvedTableMeta;
 }
 
-/** A single entry in public/defs/versions.json */
-export interface VersionEntry {
-    hash: string;
-    label: string;
-    date: string;
-}
-
 export interface DataStore {
-    tableNames: Resource<string[]>;
     tableIndex: Resource<TableIndex[]>;
     fetchTable: (name: string) => Promise<Record<string, unknown>[]>;
     getTable: (name: string) => Record<string, unknown>[] | undefined;
@@ -44,321 +41,433 @@ export interface DataStore {
     foreignKeys: Resource<ForeignKeyMapping[]>;
     getOutgoingRefs: (tableName: string) => ForeignKeyMapping[];
     getIncomingRefs: (tableName: string) => ForeignKeyMapping[];
-    /** Resolve a named enum from the manifest to its variant list */
     getEnum: (name: string) => string[] | undefined;
-    /** Return the raw AlgebraicType for a table column. */
     getColumnType: (tableName: string, columnName: string) => AlgebraicType | undefined;
-    /** Return a context object for rendering AlgebraicTypeView, or undefined while schema is loading. */
     getTypeContext: () => { schema: SpacetimeDBSchema; idxMap: Map<number, string> } | undefined;
-    /**
-     * Return the cached display-name map for a table (pk → label), or undefined if not yet loaded.
-     * Reactive: memos that call this will re-run when new tables finish loading.
-     */
     getDisplayNames: (tableName: string) => Map<string, string> | undefined;
-    /** The raw SpacetimeDB schema */
     schema: Resource<SpacetimeDBSchema | null>;
-    versions: Resource<VersionEntry[]>;
-    version: Accessor<string>;
-    setVersion: (v: string) => void;
+    searchIndex: Resource<SearchIndex | null>;
+    tag: Accessor<string>;
 }
 
-/** Returns true if a table name represents static (desc) game data that has a data file. */
 export function isStaticTable(name: string): boolean {
     return /_desc(_v\d+)?$/.test(name) || name === "claim_tile_cost";
 }
 
-const DataContext = createContext<DataStore>();
+interface VersionCaches {
+    manifests: Map<string, DefManifest | null>;
+    schemas: Map<string, SpacetimeDBSchema | null>;
+    idxMaps: Map<string, Map<number, string> | null>;
+    /** tag → tableName → rows */
+    tables: Map<string, Map<string, Record<string, unknown>[]>>;
+    /** tag → tableName → pk → label */
+    displayNames: Map<string, Map<string, Map<string, string>>>;
+    displayNameVersion: Accessor<number>;
+    bumpDisplayNameVersion: () => void;
+    /** Search index cache: tag → SearchIndex */
+    searchIndexes: Map<string, SearchIndex | null>;
+    /** Deduplication: in-flight fetches for manifests and schemas */
+    inFlightManifests: Map<string, Promise<DefManifest | null>>;
+    inFlightSchemas: Map<string, Promise<SpacetimeDBSchema | null>>;
+    inFlightSearches: Map<string, Promise<SearchIndex | null>>;
+}
 
-// --- Provider ---
+interface DataRegistry {
+    versions: Resource<VersionEntry[]>;
+    createVersionedStore: (tagSignal: Accessor<string>) => DataStore;
+}
+
+export const DataRegistryContext = createContext<DataRegistry>();
+
+interface DataScope {
+    store: DataStore;
+    tag: Accessor<string>;
+    setTag: (tag: string) => void;
+    versions: Resource<VersionEntry[]>;
+}
+
+export const DataScopeContext = createContext<DataScope>();
 
 export const DataProvider: ParentComponent = (props) => {
-    const [version, setVersion] = createSignal("latest");
-    const tableCache = new Map<string, Record<string, unknown>[]>();
-    const displayNameCache = new Map<string, Map<string, string>>();
-    const [displayNameVersion, setDisplayNameVersion] = createSignal(0);
-
-    // Fetch the pre-computed definition manifest for the current version.
-    // Always resolves (returns null on error) so downstream resources don't hang.
-    const [manifest] = createResource(version, async (ver): Promise<DefManifest | null> => {
-        try {
-            const res = await fetch(`/defs/${ver}.json`);
-            if (!res.ok) throw new Error(res.statusText);
-            return await res.json() as Promise<DefManifest>;
-        } catch (e) {
-            console.warn(`[cereal] Could not load manifest for version "${ver}":`, e);
-            return null;
-        }
-    });
-
-    // Derived resources.
-    // Source wraps manifest in an object so it's always truthy once manifest settles —
-    // returning undefined (not null) while still loading keeps the resource pending correctly.
-    const settled = () => {
-        const m = manifest();
-        return m !== undefined ? {m} : undefined;
-    };
-
-    const [tableIndex] = createResource(
-        settled,
-        ({m}): TableIndex[] => {
-            if (!m) return [];
-            const enumMap = new Map((m.enums ?? []).map((e) => [e.name, e.values]));
-            return [...m.tables]
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((meta) => {
-                    const resolvedEnumValues: Record<string, string[]> = {};
-                    for (const [col, enumName] of Object.entries(meta.enumValues)) {
-                        const variants = enumMap.get(enumName);
-                        if (variants) resolvedEnumValues[col] = variants;
-                    }
-                    return {name: meta.name, meta: {...meta, enumValues: resolvedEnumValues}};
-                });
-        },
-    );
-
-    const [tableNames] = createResource(
-        settled,
-        ({m}): string[] => {
-            if (!m) return [];
-            return [...m.tables].sort((a, b) => a.name.localeCompare(b.name)).map((t) => t.name);
-        },
-    );
-
-    const [foreignKeys] = createResource(
-        settled,
-        ({m}): ForeignKeyMapping[] => m?.foreignKeys ?? [],
-    );
-
-    // SpacetimeDB schema — fetched once (version-independent for now)
-    const [schema] = createResource(async (): Promise<SpacetimeDBSchema | null> => {
-        try {
-            const res = await fetch(`/${version()}/region_schema.json`);
-            if (!res.ok) throw new Error(res.statusText);
-            return await res.json() as Promise<SpacetimeDBSchema>;
-        } catch (e) {
-            console.warn("[cereal] Could not load region_schema.json:", e);
-            return null;
-        }
-    });
-
-    // Memoized type index map — rebuilt when schema loads
-    let cachedIdxMap: Map<number, string> | null = null;
-
-    function getIdxMap(): Map<number, string> | null {
-        const s = schema();
-        if (!s) return null;
-        if (!cachedIdxMap) cachedIdxMap = buildTypeIndexMap(s);
-        return cachedIdxMap;
-    }
-
-    function getColumnType(tableName: string, columnName: string): AlgebraicType | undefined {
-        const s = schema();
-        if (!s) return undefined;
-        return getColumnTypeElement(tableName, columnName, s);
-    }
-
-    function getTypeContext(): { schema: SpacetimeDBSchema; idxMap: Map<number, string> } | undefined {
-        const s = schema();
-        const idxMap = getIdxMap();
-        if (!s || !idxMap) return undefined;
-        return {schema: s, idxMap};
-    }
-
-    // Available versions list (fetched once)
     const [versions] = createResource(async (): Promise<VersionEntry[]> => {
         try {
-            const res = await fetch("/defs/versions.json");
+            const res = await fetch(`${DATA_CDN_BASE}/versions.json`);
             if (!res.ok) throw new Error(res.statusText);
-            return res.json();
+            const raw = await res.json() as VersionEntry[];
+            return raw.map((v) => ({
+                tag: v.tag,
+                label: v.label,
+                description: v.description,
+            }));
         } catch (e) {
             console.warn("[cereal] Could not load versions.json:", e);
             return [];
         }
     });
 
-    const outgoingRefsMap = createMemo(() => {
-        const map = new Map<string, ForeignKeyMapping[]>();
-        for (const fk of foreignKeys() ?? []) {
-            const list = map.get(fk.sourceTable);
-            if (list) list.push(fk);
-            else map.set(fk.sourceTable, [fk]);
-        }
-        return map;
-    });
-
-    const incomingRefsMap = createMemo(() => {
-        const map = new Map<string, ForeignKeyMapping[]>();
-        const addToMap = (target: string, fk: ForeignKeyMapping) => {
-            const list = map.get(target);
-            if (list) {
-                if (!list.includes(fk)) list.push(fk);
-            } else map.set(target, [fk]);
-        };
-        for (const fk of foreignKeys() ?? []) {
-            addToMap(fk.targetTable, fk);
-            // Also index by each conditional target table so those tables show incoming refs
-            for (const cond of fk.conditionalTargets ?? []) {
-                if (cond.targetTable && cond.targetTable !== fk.targetTable) {
-                    addToMap(cond.targetTable, fk);
-                }
-            }
-        }
-        return map;
-    });
-
-    function getEnum(name: string): string[] | undefined {
-        return manifest()?.enums?.find((e) => e.name === name)?.values;
-    }
-
-    function getTableMeta(name: string): ResolvedTableMeta | undefined {
-        const m = manifest();
-        const meta = m?.tables.find((t) => t.name === name);
-        if (!meta) return undefined;
-        // Resolve column->enumName to column->variants[]
-        const enumMap = new Map((m!.enums ?? []).map((e) => [e.name, e.values]));
-        const resolvedEnumValues: Record<string, string[]> = {};
-        for (const [col, enumName] of Object.entries(meta.enumValues)) {
-            const variants = enumMap.get(enumName);
-            if (variants) resolvedEnumValues[col] = variants;
-        }
-        return {...meta, enumValues: resolvedEnumValues};
-    }
-
-    async function fetchTable(name: string): Promise<Record<string, unknown>[]> {
-        if (tableCache.has(name)) return tableCache.get(name)!;
-        let res: Response;
-        try {
-            res = await fetch(`/${version()}/static/${name}.json`);
-        } catch (e) {
-            const msg = `[cereal] Network error fetching table "${name}": ${e}`;
-            console.error(msg);
-            throw new Error(msg);
-        }
-        if (!res.ok) {
-            const msg = `[cereal] HTTP ${res.status} fetching table "${name}"`;
-            console.error(msg);
-            throw new Error(msg);
-        }
-        let rows: Record<string, unknown>[];
-        try {
-            rows = (await res.json()) as Record<string, unknown>[];
-        } catch (e) {
-            const msg = `[cereal] Failed to parse JSON for table "${name}": ${e}`;
-            console.error(msg);
-            throw new Error(msg);
-        }
-        tableCache.set(name, rows);
-        // Build display name map for this table if it has a displayField
-        const meta = getTableMeta(name);
-        if (meta?.primaryKey && meta.displayField) {
-            const map = new Map<string, string>();
-            for (const row of rows) {
-                const pk = String(row[meta.primaryKey]);
-                const label = row[meta.displayField];
-                if (label) map.set(pk, String(label));
-            }
-            displayNameCache.set(name, map);
-            setDisplayNameVersion((v) => v + 1);
-
-            // Special case: crafting_recipe_desc names contain {0} (output) and {1} (input)
-            // format params that need to be resolved to actual item/cargo names.
-            if (name === "crafting_recipe_desc") {
-                resolveCraftingRecipeNames(rows, meta.primaryKey, map).then(() => {
-                    setDisplayNameVersion((v) => v + 1);
-                }).catch(() => {/* non-fatal */});
-            }
-        }
-        return rows;
-    }
-
-    /**
-     * Resolves {0} (first output) and {1} (first input) placeholders in
-     * crafting_recipe_desc display names by looking up item_desc/cargo_desc.
-     * Mutates the provided `map` in place and is called async after the initial
-     * map is already cached, so the reactive signal is bumped again when done.
-     */
-    async function resolveCraftingRecipeNames(
-        rows: Record<string, unknown>[],
-        primaryKey: string,
-        map: Map<string, string>,
-    ) {
-        const [itemRows, cargoRows] = await Promise.all([
-            fetchTable("item_desc").catch(() => [] as Record<string, unknown>[]),
-            fetchTable("cargo_desc").catch(() => [] as Record<string, unknown>[]),
-        ]);
-
-        const itemMeta = getTableMeta("item_desc");
-        const cargoMeta = getTableMeta("cargo_desc");
-
-        const itemById = new Map<string, string>();
-        for (const r of itemRows) {
-            if (itemMeta?.primaryKey && itemMeta.displayField) {
-                const pk = String(r[itemMeta.primaryKey]);
-                const label = r[itemMeta.displayField];
-                if (label) itemById.set(pk, String(label));
-            }
-        }
-        const cargoById = new Map<string, string>();
-        for (const r of cargoRows) {
-            if (cargoMeta?.primaryKey && cargoMeta.displayField) {
-                const pk = String(r[cargoMeta.primaryKey]);
-                const label = r[cargoMeta.displayField];
-                if (label) cargoById.set(pk, String(label));
-            }
-        }
-
-        const lookupStack = (stack: unknown): string | undefined => {
-            if (!stack || typeof stack !== "object" || Array.isArray(stack)) return undefined;
-            const s = stack as Record<string, unknown>;
-            const id = String(s["item_id"] ?? "");
-            const type = String(s["item_type"] ?? "");
-            return type === "Cargo" ? cargoById.get(id) : itemById.get(id);
-        };
-
-        for (const row of rows) {
-            const template = map.get(String(row[primaryKey]));
-            if (!template || (!template.includes("{0}") && !template.includes("{1}"))) continue;
-
-            const crafted = row["crafted_item_stacks"];
-            const consumed = row["consumed_item_stacks"];
-            const output = Array.isArray(crafted) ? crafted[0] : crafted;
-            const input = Array.isArray(consumed) ? consumed[0] : consumed;
-
-            const resolved = template
-                .replace("{0}", lookupStack(output) ?? "{0}")
-                .replace("{1}", lookupStack(input) ?? "{1}");
-
-            map.set(String(row[primaryKey]), resolved);
-        }
-    }
-
-    const store: DataStore = {
-        tableNames,
-        tableIndex,
-        fetchTable,
-        getTable: (name) => tableCache.get(name),
-        getTableMeta,
-        foreignKeys,
-        getOutgoingRefs: (tableName) => outgoingRefsMap().get(tableName) ?? [],
-        getIncomingRefs: (tableName) => incomingRefsMap().get(tableName) ?? [],
-        getEnum,
-        getColumnType,
-        getTypeContext,
-        getDisplayNames: (name: string) => {
-            displayNameVersion(); // reactive dependency — re-runs callers when any table loads
-            return displayNameCache.get(name);
-        },
-        schema,
-        versions,
-        version,
-        setVersion,
+    const [displayNameVersion, setDisplayNameVersion] = createSignal(0);
+    const caches: VersionCaches = {
+        manifests: new Map(),
+        schemas: new Map(),
+        idxMaps: new Map(),
+        tables: new Map(),
+        displayNames: new Map(),
+        displayNameVersion,
+        bumpDisplayNameVersion: () => setDisplayNameVersion((v) => v + 1),
+        searchIndexes: new Map(),
+        inFlightManifests: new Map(),
+        inFlightSchemas: new Map(),
+        inFlightSearches: new Map(),
     };
 
-    return <DataContext.Provider value={store}>{props.children}</DataContext.Provider>;
+    function createVersionedStore(tagSignal: Accessor<string>): DataStore {
+        const [manifest] = createResource(tagSignal, async (ver): Promise<DefManifest | null> => {
+            // "__pending__" is the placeholder before real versions load — skip fetching
+            if (!ver || ver === "__pending__") return null;
+            if (caches.manifests.has(ver)) return caches.manifests.get(ver)!;
+            // Deduplicate concurrent fetches for the same version
+            if (caches.inFlightManifests.has(ver)) return caches.inFlightManifests.get(ver)!;
+            const promise = (async () => {
+                try {
+                    const res = await fetch(`${DATA_CDN_BASE}/data/${ver}/version_${ver}.json`);
+                    if (!res.ok) throw new Error(res.statusText);
+                    const m = await res.json() as DefManifest;
+                    caches.manifests.set(ver, m);
+                    return m;
+                } catch (e) {
+                    console.warn(`[cereal] Could not load manifest for "${ver}":`, e);
+                    caches.manifests.set(ver, null);
+                    return null;
+                } finally {
+                    caches.inFlightManifests.delete(ver);
+                }
+            })();
+            caches.inFlightManifests.set(ver, promise);
+            return promise;
+        });
+
+        const [schema] = createResource(tagSignal, async (ver): Promise<SpacetimeDBSchema | null> => {
+            if (!ver || ver === "__pending__") return null;
+            if (caches.schemas.has(ver)) return caches.schemas.get(ver)!;
+            if (caches.inFlightSchemas.has(ver)) return caches.inFlightSchemas.get(ver)!;
+            const promise = (async () => {
+                try {
+                    const res = await fetch(`${DATA_CDN_BASE}/data/${ver}/region_schema.json`);
+                    if (!res.ok) throw new Error(res.statusText);
+                    const s = await res.json() as SpacetimeDBSchema;
+                    caches.schemas.set(ver, s);
+                    return s;
+                } catch (e) {
+                    console.warn("[cereal] Could not load region_schema.json:", e);
+                    caches.schemas.set(ver, null);
+                    return null;
+                } finally {
+                    caches.inFlightSchemas.delete(ver);
+                }
+            })();
+            caches.inFlightSchemas.set(ver, promise);
+            return promise;
+        });
+
+        const settled = () => { const m = manifest(); return m !== undefined ? {m} : undefined; };
+
+        const [searchIndex] = createResource(tagSignal, async (ver): Promise<SearchIndex | null> => {
+            if (!ver || ver === "__pending__") return null;
+            if (caches.searchIndexes.has(ver)) return caches.searchIndexes.get(ver)!;
+            if (caches.inFlightSearches.has(ver)) return caches.inFlightSearches.get(ver)!;
+            const promise = (async () => {
+                try {
+                    const res = await fetch(`${DATA_CDN_BASE}/data/${ver}/search_${ver}.json`);
+                    if (!res.ok) throw new Error(res.statusText);
+                    const idx = await res.json() as SearchIndex;
+                    caches.searchIndexes.set(ver, idx);
+                    return idx;
+                } catch (e) {
+                    console.warn(`[cereal] Could not load search index for "${ver}":`, e);
+                    caches.searchIndexes.set(ver, null);
+                    return null;
+                } finally {
+                    caches.inFlightSearches.delete(ver);
+                }
+            })();
+            caches.inFlightSearches.set(ver, promise);
+            return promise;
+        });
+
+        const [tableIndex] = createResource(settled, ({m}): TableIndex[] => {
+            if (!m) return [];
+            const enumMap = new Map((m.enums ?? []).map((e) => [e.name, e.values]));
+            return [...m.tables].sort((a, b) => a.name.localeCompare(b.name)).map((meta) => {
+                const ev: Record<string, string[]> = {};
+                for (const [col, enumName] of Object.entries(meta.enumValues)) {
+                    const v = enumMap.get(enumName);
+                    if (v) ev[col] = v;
+                }
+                return {name: meta.name, meta: {...meta, enumValues: ev}};
+            });
+        });
+
+        const [foreignKeys] = createResource(settled, ({m}): ForeignKeyMapping[] => m?.foreignKeys ?? []);
+
+        function getIdxMap(): Map<number, string> | null {
+            const ver = tagSignal();
+            if (caches.idxMaps.has(ver)) return caches.idxMaps.get(ver)!;
+            const s = schema();
+            if (!s) return null;
+            const map = buildTypeIndexMap(s);
+            caches.idxMaps.set(ver, map);
+            return map;
+        }
+
+        function resolveEnumValues(meta: TableMeta): Record<string, string[]> {
+            const m = manifest();
+            if (!m) return {};
+            const enumMap = new Map((m.enums ?? []).map((e) => [e.name, e.values]));
+            const ev: Record<string, string[]> = {};
+            for (const [col, enumName] of Object.entries(meta.enumValues)) {
+                const v = enumMap.get(enumName);
+                if (v) ev[col] = v;
+            }
+            return ev;
+        }
+
+        function getTableMeta(name: string): ResolvedTableMeta | undefined {
+            const m = manifest();
+            const meta = m?.tables.find((t) => t.name === name);
+            if (!meta) return undefined;
+            return {...meta, enumValues: resolveEnumValues(meta)};
+        }
+
+        const outgoingRefsMap = createMemo(() => {
+            const map = new Map<string, ForeignKeyMapping[]>();
+            for (const fk of foreignKeys() ?? []) {
+                const list = map.get(fk.sourceTable);
+                if (list) list.push(fk);
+                else map.set(fk.sourceTable, [fk]);
+            }
+            return map;
+        });
+
+        const incomingRefsMap = createMemo(() => {
+            const map = new Map<string, ForeignKeyMapping[]>();
+            const add = (target: string, fk: ForeignKeyMapping) => {
+                const list = map.get(target);
+                if (list) { if (!list.includes(fk)) list.push(fk); } else map.set(target, [fk]);
+            };
+            for (const fk of foreignKeys() ?? []) {
+                add(fk.targetTable, fk);
+                for (const cond of fk.conditionalTargets ?? []) {
+                    if (cond.targetTable && cond.targetTable !== fk.targetTable)
+                        add(cond.targetTable, fk);
+                }
+            }
+            return map;
+        });
+
+        async function fetchTable(name: string): Promise<Record<string, unknown>[]> {
+            const ver = tagSignal();
+            let vCache = caches.tables.get(ver);
+            if (!vCache) { vCache = new Map(); caches.tables.set(ver, vCache); }
+            if (vCache.has(name)) return vCache.get(name)!;
+
+            let res: Response;
+            try {
+                res = await fetch(`${DATA_CDN_BASE}/data/${ver}/static/${name}.json`);
+            } catch (e) {
+                throw new Error(`[cereal] Network error fetching "${name}": ${e}`);
+            }
+            if (!res.ok) throw new Error(`[cereal] HTTP ${res.status} fetching "${name}"`);
+
+            let rows: Record<string, unknown>[];
+            try {
+                rows = (await res.json()) as Record<string, unknown>[];
+            } catch (e) {
+                throw new Error(`[cereal] Failed to parse JSON for "${name}": ${e}`);
+            }
+            vCache.set(name, rows);
+
+            const meta = getTableMeta(name);
+            if (meta?.primaryKey && meta.displayField) {
+                let dnVersionMap = caches.displayNames.get(ver);
+                if (!dnVersionMap) { dnVersionMap = new Map(); caches.displayNames.set(ver, dnVersionMap); }
+                const map = new Map<string, string>();
+                for (const row of rows) {
+                    const pk = String(row[meta.primaryKey]);
+                    const label = row[meta.displayField];
+                    if (label) map.set(pk, String(label));
+                }
+                dnVersionMap.set(name, map);
+                caches.bumpDisplayNameVersion();
+
+                if (name === "crafting_recipe_desc") {
+                    resolveCraftingRecipeNames(ver, rows, meta.primaryKey, map)
+                        .then(() => caches.bumpDisplayNameVersion())
+                        .catch(() => {/* non-fatal */});
+                }
+            }
+            return rows;
+        }
+
+        async function resolveCraftingRecipeNames(
+            ver: string,
+            rows: Record<string, unknown>[],
+            primaryKey: string,
+            map: Map<string, string>,
+        ) {
+            await Promise.all([fetchTable("item_desc").catch(() => []), fetchTable("cargo_desc").catch(() => [])]);
+            const dnVer = caches.displayNames.get(ver);
+            const itemById = dnVer?.get("item_desc") ?? new Map<string, string>();
+            const cargoById = dnVer?.get("cargo_desc") ?? new Map<string, string>();
+
+            const lookupStack = (stack: unknown): string | undefined => {
+                if (!stack || typeof stack !== "object" || Array.isArray(stack)) return undefined;
+                const s = stack as Record<string, unknown>;
+                const id = String(s["item_id"] ?? "");
+                return String(s["item_type"] ?? "") === "Cargo" ? cargoById.get(id) : itemById.get(id);
+            };
+
+            for (const row of rows) {
+                const template = map.get(String(row[primaryKey]));
+                if (!template || (!template.includes("{0}") && !template.includes("{1}"))) continue;
+                const crafted = row["crafted_item_stacks"];
+                const consumed = row["consumed_item_stacks"];
+                map.set(String(row[primaryKey]), template
+                    .replace("{0}", lookupStack(Array.isArray(crafted) ? crafted[0] : crafted) ?? "{0}")
+                    .replace("{1}", lookupStack(Array.isArray(consumed) ? consumed[0] : consumed) ?? "{1}"));
+            }
+        }
+
+        return {
+            tableIndex,
+            fetchTable,
+            getTable: (name) => caches.tables.get(tagSignal())?.get(name),
+            getTableMeta,
+            foreignKeys,
+            getOutgoingRefs: (t) => outgoingRefsMap().get(t) ?? [],
+            getIncomingRefs: (t) => incomingRefsMap().get(t) ?? [],
+            getEnum: (name) => manifest()?.enums?.find((e) => e.name === name)?.values,
+            getColumnType: (tableName, columnName) => {
+                const s = schema();
+                return s ? getColumnTypeElement(tableName, columnName, s) : undefined;
+            },
+            getTypeContext: () => {
+                const s = schema();
+                const idxMap = getIdxMap();
+                return s && idxMap ? {schema: s, idxMap} : undefined;
+            },
+            getDisplayNames: (name: string) => {
+                caches.displayNameVersion(); // reactive dep
+                return caches.displayNames.get(tagSignal())?.get(name);
+            },
+            schema,
+            searchIndex,
+            tag: tagSignal,
+        };
+    }
+
+    return (
+        <DataRegistryContext.Provider value={{versions, createVersionedStore}}>
+            {props.children}
+        </DataRegistryContext.Provider>
+    );
 };
 
-export function useData() {
-    const ctx = useContext(DataContext);
-    if (!ctx) throw new Error("useData must be used within DataProvider");
-    return ctx;
+export interface VersionScopeProviderProps {
+    syncUrl?: boolean;
+    initialTag?: string;
+}
+
+export const VersionScopeProvider: ParentComponent<VersionScopeProviderProps> = (props) => {
+    const registry = useContext(DataRegistryContext);
+    if (!registry) throw new Error("VersionScopeProvider must be inside DataProvider");
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
+    const syncUrl = () => props.syncUrl !== false;
+
+    const [tag, setTag] = createSignal<string | null>(props.initialTag ?? null);
+    let initialized = false;
+
+    // Don't expose "__pending__" to the store — wait for the real version list
+    const resolvedTag: Accessor<string> = () => tag() ?? "__pending__";
+
+    // ── URL→tag: initialize from URL/versions, then react to explicit URL version changes ──
+    createEffect(() => {
+        if (!syncUrl()) return;
+        const vList = registry.versions();
+        if (!vList?.length) return;
+        const urlTag = (searchParams.version as string | undefined) || undefined;
+        const latest = vList[0].tag;
+
+        if (!initialized) {
+            initialized = true;
+            if (urlTag && vList.some((v) => v.tag === urlTag)) {
+                setTag(urlTag);
+            } else {
+                if (urlTag) setSearchParams({ version: undefined }, { replace: true });
+                setTag(latest);
+            }
+            return;
+        }
+
+        // Post-init: update tag only when URL explicitly carries a (different) valid version.
+        // When urlTag is absent (e.g. a plain link stripped it), leave tag alone —
+        // the tag→URL effect below will add it back.
+        const currentTag = untrack(tag);
+        if (urlTag && urlTag !== currentTag) {
+            if (vList.some((v) => v.tag === urlTag)) {
+                setTag(urlTag);
+            } else {
+                setSearchParams({ version: undefined }, { replace: true });
+            }
+        }
+    });
+
+    // ── tag→URL: after every navigation or tag change, ensure URL version param is correct ──
+    // Tracks location.pathname + location.search so it re-runs on every router navigation.
+    // Uses setSearchParams (router-owned) so the router never overwrites our change afterward.
+    createEffect(() => {
+        const currentTag = tag();
+        const _path = location.pathname;   // track navigation
+        const urlSearch = location.search; // track search param changes
+
+        if (!syncUrl() || !initialized || !currentTag || currentTag === "__pending__") return;
+
+        const vList = untrack(() => registry.versions());
+        if (!vList?.length) return;
+        const latest = vList[0].tag;
+
+        const urlParams = new URLSearchParams(urlSearch);
+        const urlTag = urlParams.get("version") || undefined;
+
+        if (currentTag === latest) {
+            if (urlTag) setSearchParams({ version: undefined }, { replace: true });
+        } else {
+            if (urlTag !== currentTag) setSearchParams({ version: currentTag }, { replace: true });
+        }
+    });
+
+    const store = registry.createVersionedStore(resolvedTag);
+
+    return (
+        <DataScopeContext.Provider value={{store, tag: resolvedTag, setTag, versions: registry.versions}}>
+            {props.children}
+        </DataScopeContext.Provider>
+    );
+};
+
+export function useData(): DataStore {
+    const ctx = useContext(DataScopeContext);
+    if (!ctx) throw new Error("useData must be used within VersionScopeProvider");
+    return ctx.store;
+}
+
+export function useVersions() {
+    const ctx = useContext(DataScopeContext);
+    if (!ctx) throw new Error("useVersions must be used within VersionScopeProvider");
+    return {
+        versions: ctx.versions,
+        currentTag: ctx.tag,
+        setCurrentTag: ctx.setTag,
+    };
 }

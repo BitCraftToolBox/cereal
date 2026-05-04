@@ -75,8 +75,8 @@ export function createObjectRow(
     });
 
     const [rows] = createResource(
-        () => (isFetchable() ? tableName() : null),
-        (name) => data.fetchTable(name),
+        () => isFetchable() ? {tag: data.tag(), name: tableName()} : null,
+        (s) => data.fetchTable(s.name),
     );
 
     const row = createMemo(() => {
@@ -241,12 +241,15 @@ export function createIncomingResults(
     const fetchableTables = createMemo(() =>
         [...new Set(specs().map((s) => s.fk.sourceTable))].filter((t) => {
             const m = data.getTableMeta(t);
-            return isStaticTable(t) && (m?.isPublic ?? true);
+            return m !== undefined && isStaticTable(t) && (m.isPublic ?? true);
         }),
     );
 
     const [tableData] = createResource(
-        () => fetchableTables().join(",") || null,
+        () => {
+            const t = fetchableTables().join(",");
+            return t ? `${data.tag()}:${t}` : null;
+        },
         async () => {
             const tables = fetchableTables();
             const pairs = await Promise.all(

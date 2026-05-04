@@ -163,11 +163,12 @@ export default function TableView() {
     };
 
     const meta = () => data.getTableMeta(params.name);
-    const canLoad = () => isStaticTable(params.name) && (meta()?.isPublic ?? true);
+    // Only attempt to load once the manifest is available (meta !== undefined) AND the table is static/public
+    const canLoad = () => { const m = meta(); return m != null && isStaticTable(params.name) && (m.isPublic ?? true); };
 
     const [rows] = createResource(
-        () => canLoad() ? params.name : null,
-        (name) => data.fetchTable(name!)
+        () => canLoad() ? {tag: data.tag(), name: params.name} : null,
+        (s) => data.fetchTable(s.name)
     );
 
     createEffect(() => {

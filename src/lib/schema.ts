@@ -1,4 +1,20 @@
 /**
+ * Compact per-object entry inside a SearchIndex table group.
+ * - Plain string/number → just the primary key (table has no display name or search fields)
+ * - Object → pk + optional display name + optional search field pairs
+ */
+export type CompactSearchEntry =
+    | string
+    | number
+    | { pk: string | number; n?: string; f?: [string, string][] };
+
+/** Top-level structure of search_<tag>.json */
+export interface SearchIndex {
+    tag: string;
+    entries: Record<string, CompactSearchEntry[]>;
+}
+
+/**
  * Foreign key mapping configuration.
  * Maps table fields to the tables they reference.
  */
@@ -29,9 +45,6 @@ export interface EnumDef {
     values: string[];
 }
 
-/** Base URL for the sprite CDN. Paths from spriteFields are appended with .webp */
-export const SPRITE_CDN_BASE = "https://cdn.brico.app/sprites";
-
 /**
  * Table metadata included in the version manifest.
  */
@@ -49,14 +62,19 @@ export interface TableMeta {
 }
 
 /**
- * A pre-computed manifest of all tables and FK mappings for a specific data version.
- * Stored in public/defs/<hash>.json, with public/defs/latest.json pointing at the current version.
+ * A single entry in public/versions.json - lightweight metadata about each version.
  */
-export interface DefManifest {
-    hash: string;
-    label: string;
-    date: string;
-    description: string | undefined;
+export interface VersionEntry {
+    tag: string;
+    label?: string;
+    description?: string;
+}
+
+/**
+ * A pre-computed manifest of all tables and FK mappings for a specific data version.
+ * Stored in public/data/<tag>/version_<tag>.json.
+ */
+export interface DefManifest extends VersionEntry {
     /** All named enums, deduplicated */
     enums: EnumDef[];
     /** Metadata for all tables */
@@ -119,7 +137,7 @@ export function resolveTargetTableWithCondition(
 }
 
 /**
- * Get a nested value by dot-separated path, traversing into arrays by collecting all element values.
+ * Get a nested value by a dot-separated path, traversing into arrays by collecting all element values.
  */
 export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     const parts = path.split(".");

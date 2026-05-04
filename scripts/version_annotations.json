@@ -1,0 +1,202 @@
+[
+  {
+    "tag": "2025-06-09",
+    "label": "Demo Start",
+    "description": "First available data export.\n\nThe BitCraft Online Demo first started on May 29th (the Playtest/stress test was on May 16th), but no data exports exist for earlier versions to my knowledge.\nSteam post: https://store.steampowered.com/news/app/3454650/view/537729347429073577"
+  },
+  {
+    "tag": "2025-06-16",
+    "label": "Demo End",
+    "description": "Last version during the BitCraft Online Demo.\n\nThe demo was actually extended one more day to the 17th, but data wasn't changed."
+  },
+  {
+    "tag": "2025-06-27",
+    "label": "EA1 Start",
+    "description": "First available data export for Early Access 1.\n\nThe first version of Early Access was released on June 21st, but technical issues and changes delayed data exports for a few days.\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731249563763089"
+  },
+  {
+    "tag": "2025-07-02",
+    "label": "1.01 - WASD, Claim Supply Balance",
+    "description": "The first weekly update for Early Access.\n\nA status update was posted on the website, and a preview build was released on Steam with WASD controls.\nBitCraft news: https://bitcraftonline.com/news/early-access-week-2\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731883551689643\nPatch notes: https://discord.com/channels/558439686083969035/879663330657206332/1390050681557221539\n\nNote: Version 1.02 is missing after this. It's possible they internally counted pushing the preview build to main as 1.02 due to some small changes.\nDiscord announcement: https://discord.com/channels/558439686083969035/1260246406963134496/1390410719379329165"
+  },
+  {
+    "tag": "2025-07-09",
+    "label": "1.03",
+    "description": "Weekly update. Banks deconstructable again, settlement minimum range added.\n\nA preview client went out on the 8th, server changes arrived on the 9th along with a Discord announcement. Main Steam build and announcement went out on the 10th.\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1392539589645959279\nDiscord patch notes:https://discord.com/channels/558439686083969035/1260246406963134496/1392539315233620048\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731883551691561"
+  },
+  {
+    "tag": "2025-07-17",
+    "label": "1.04 - Tool Scrapping",
+    "description": "Added tool scrapping system and the Lusul pet.\n\nPreview client went out on the 16th, but most changes were server-side and arrived on the 17th.\nDiscord announcement (preview build): https://discord.com/channels/558439686083969035/879663330657206332/1395157049909837864\nDiscord patch notes (preview build): https://discord.com/channels/558439686083969035/1260246406963134496/1395156281676922950\nDiscord patch notes (main update): https://discord.com/channels/558439686083969035/1260246406963134496/1395436397003018250\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537733876590575720"
+  },
+  {
+    "tag": "2025-07-24",
+    "label": "1.05 - Player Housing & Group Crafting",
+    "description": "Initial release of housing, addition of shared crafts.\n\nAnnouncement of developer program and clarifications on third-party tools and data.\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1397695410642092115\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1397948491119984721\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537734420418789478"
+  },
+  {
+    "tag": "2025-07-31",
+    "label": "1.06 - Star Stones",
+    "description": "Star stones from Hub Inventory Cubes were added, along with moving empire capitals and usurping.\n\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1400517017228017715\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1400510846232297604\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537735054151909515"
+  },
+  {
+    "tag": "2025-08-07",
+    "description": "The client build for the weekly update (1.07) was delayed a day, so this only includes some server-side changes.\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1403135178007646339\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1403134858129178735\nNo Steam post."
+  },
+  {
+    "tag": "2025-08-08",
+    "label": "1.07 - DMs",
+    "description": "Addition of direct messaging (the first use of SpacetimeDB's RLS in BitCraft).\n\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1403475442119217272\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1403476266996469781\nSteam post: https://store.steampowered.com/news/app/3454650/view/537735688569750273"
+  },
+  {
+    "tag": "2025-08-14",
+    "label": "1.08 - Social",
+    "description": "Addition of the Social window, including friends and muted players.\n\nDiscord announcement (actually just patch notes): https://discord.com/channels/558439686083969035/879663330657206332/1405525965811224658\nDiscord patch notes (same content but the right channel): https://discord.com/channels/558439686083969035/1260246406963134496/1405526674723835984\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/824840894153752767"
+  },
+  {
+    "tag": "2025-08-25",
+    "description": "Client-only changed released August 21st for the weekly update (1.09). Combat update delayed, so no server changes.\nDiscord announcement regarding delay: https://discord.com/channels/558439686083969035/879663330657206332/1408427740830371881\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1407654050689847307\nSteam Post: https://steamcommunity.com/games/3454650/announcements/detail/537736957039476915"
+  },
+  {
+    "tag": "2025-09-02",
+    "label": "1.10 - Combat Update Pre-Patch",
+    "description": "Pre-patch for Combat Update/Dungeons.\n\nAction bar changes, combat abilities, and various combat mechanic changes.\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1412403266645655582\nDiscord follow-up announcement: https://discord.com/channels/558439686083969035/879663330657206332/1412823556815065190\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537737591542252234"
+  },
+  {
+    "tag": "2025-09-04",
+    "label": "Dungeons",
+    "description": "Combat update and Feral Sentinel dungeon release.\n\nActual release of the dungeon.\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1413153270599520388\nSteam post, but it just links to a Twitch stream which is gone now: https://store.steampowered.com/news/app/3454650/view/537738224842311137"
+  },
+  {
+    "tag": "2025-09-09",
+    "description": "Small dungeon update.\n\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1414905468089794612\nSteam post: https://store.steampowered.com/news/app/3454650/view/537738224842311691"
+  },
+  {
+    "tag": "2025-09-11",
+    "label": "1.11",
+    "description": "Updates to house teleporting and world map settlement UX (waystone/bank/market icons).\n\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1415643466808954891\nDiscord follow-up announcement: https://discord.com/channels/558439686083969035/879663330657206332/1416026520648159264\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/528731659977097558"
+  },
+  {
+    "tag": "2025-09-18",
+    "label": "1.12 - Dungeon Sweep-up",
+    "description": "Scaling and weighted loot for dungeons. T7+ food and other stuff.\n\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1418198332391690290\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1418212013590450248\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/536613594671875174"
+  },
+  {
+    "tag": "2025-09-25",
+    "label": "1.13 - T1 Dungeon, Hunting and Cargo Buffs",
+    "description": "Addition of the T1 (Skitch) dungeon, hunting QoL changes, and deployable cargo buffs.\n\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1420691256677240862\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1420688668523368569\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/536614228524532080"
+  },
+  {
+    "tag": "2025-10-02",
+    "label": "1.14 - Winds of Trade",
+    "description": "Major Sailing update.\n\nAddition of the wind system and sailing loot.\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1423226945897758732\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1423302347429253161\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/536614228524533104"
+  },
+  {
+    "tag": "2025-10-09",
+    "label": "1.15 - Autumn Harvest",
+    "description": "Seasonal content for Autumn and claim takeover changes.\n\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1425828343676145786\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1425839060269797498\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/536615496782446731"
+  },
+  {
+    "tag": "2025-10-16",
+    "label": "1.16 - Traveler's Trade",
+    "description": "Cart off-roading and other QoL.\n\nBitCraft news: https://bitcraftonline.com/news/traveler-s-trade\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1428345034390114304\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1428346504367571007\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/552378815101272199"
+  },
+  {
+    "tag": "2025-10-23",
+    "label": "1.17 - A Spooky Update",
+    "description": "Additions of Halloween content to Autumn seasonal event and custom chat channels.\n\nBitCraft news: https://bitcraftonline.com/news/a-spooky-update\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1430906077649834146\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1430907655043416187\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/520854166700034455"
+  },
+  {
+    "tag": "2025-10-30",
+    "label": "1.18 - Outposts & Artisan Towns",
+    "description": "Specialized claim research for outpost/township system.\n\nAlso added qitt pets and Hexite Shard shop.\nPremium: Pumpkin\nBitCraft news: https://bitcraftonline.com/news/30-10-25-monthly-update\nBitCraft news 2: https://bitcraftonline.com/news/pumpkin-the-cat\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1433453053998272563\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1433453086470570075\nSteam post: https://store.steampowered.com/news/app/3454650/view/715635575916331625"
+  },
+  {
+    "tag": "2025-11-06",
+    "label": "1.19 - Threaded Wilds",
+    "description": "Addition of T7 dungeon, Hunter's Goat, and more packaging.\n\nBitCraft news: https://bitcraftonline.com/news/threaded-wilds\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1435977731983675512\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1435971901284421783\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/567017334005301516"
+  },
+  {
+    "tag": "2025-11-07",
+    "description": "Hotfix update.\n\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1436334403700658289\nSteam post: https://store.steampowered.com/news/app/3454650/view/567017334005301980"
+  },
+  {
+    "tag": "2025-11-13",
+    "label": "1.20 - Cozy Cottage",
+    "description": "Added profession and skill hats and cozy cottage furniture set.\n\nPremium: Empire banners\nBitCraft news: https://bitcraftonline.com/news/cosy-cottage\nBitCraft news 2: https://bitcraftonline.com/news/empire-banners\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1438533357796458649\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/599669165093028039"
+  },
+  {
+    "tag": "2025-11-20",
+    "label": "1.21 - Brick by Brick",
+    "description": "Addition of various walls, gates, and braziers.\n\nBitCraft news: https://bitcraftonline.com/news/patch-notes-brick-by-brick\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1441045177518264461\nSteam post: https://store.steampowered.com/news/app/3454650/view/596292007595344930"
+  },
+  {
+    "tag": "2025-11-27",
+    "label": "1.22 - Founding a Fortress",
+    "description": "Addition of large walls, gates, and towers. New ability bar system.\n\nPremium: Gilded pavement\nBitCraft news: https://bitcraftonline.com/news/founding-a-fortress\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1443628246456340581\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/518605540709892353"
+  },
+  {
+    "tag": "2025-12-12",
+    "label": "1.23 - Midwinter Begins",
+    "description": "Addition of Midwinter seasonal event.\n\nPremium: Sweaters, Snowball pet\nBitCraft news: https://bitcraftonline.com/news/midwinter-begins-2025-patch-notes\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1449025622453129389\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/543376693580005549"
+  },
+  {
+    "tag": "2025-12-18",
+    "label": "1.24 - Midwinter Eve",
+    "description": "Addition of the prospecting system.\n\nPremium: Everwoods outfits, Midwinter furniture\nBitCraft news: https://bitcraftonline.com/news/midwinter-eve-2025-patch-notes\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1451240399019573399\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/518607443608994737"
+  },
+  {
+    "tag": "2026-01-08",
+    "label": "1.25 - Link & Go",
+    "description": "Addition of internationalization support and hyperlinks in chat.\n\nBitCraft news: https://bitcraftonline.com/news/patch-notes-link-and-go\nDiscord announcement/patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1458831430971818087\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/518609345891533560"
+  },
+  {
+    "tag": "2026-01-22",
+    "label": "1.26 - New Year Clean Up",
+    "description": "Addition of quest system, end of Midwinter event.\n\nBitCraft news: https://bitcraftonline.com/news/new-year-clean-up\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/490463116313757104"
+  },
+  {
+    "tag": "2026-02-05",
+    "label": "1.27 - Cocounuts and Companions",
+    "description": "Final content update for EA1.\n\nLots of quests added, including coconut hat, skiffs, and jakyl pets. Hexite meteor event also added.\nPremium: emotes\nBitCraft news: https://bitcraftonline.com/news/patch-notes-coconuts-and-companions\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/524241382256148892"
+  },
+  {
+    "tag": "2026-02-25",
+    "label": "1.28 - A New World",
+    "description": "Launch of Early Access 2.\n\nNew world, empire overhaul, new onboarding.\nPremium: First Awakened outfit.\nBitCraft news: https://bitcraftonline.com/news/a-new-world-patch-notes\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/503977086274241010"
+  },
+  {
+    "tag": "2026-03-02",
+    "description": "Bugfix and balance update.\n\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1478122892607885472\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/503977086274241425"
+  },
+  {
+    "tag": "2026-03-05",
+    "label": "1.29 - Carts and Claws",
+    "description": "Added Cart II + III quests, Alesi pet changes.\n\nBitCraft news: https://bitcraftonline.com/news/patch-notes-carts-and-claws\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/492718721443299687"
+  },
+  {
+    "tag": "2026-03-12",
+    "label": "1.30",
+    "description": "Minor patch. Added Goat (III), various client fixes.\n\nBitCraft news: https://bitcraftonline.com/news/patch-notes-march-12th\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/509607850577756398"
+  },
+  {
+    "tag": "2026-03-19",
+    "label": "1.31 - Ascension of a Titan",
+    "description": "Added equipment presets and profession crits.\n\nPremium: Titan outfits, Leo pet, Titan furniture, emotes\nBitCraft news: https://bitcraftonline.com/news/patch-notes-ascension-of-a-titan\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/514112083979141499"
+  },
+  {
+    "tag": "2026-04-02",
+    "label": "1.32 - Roots and Ruins",
+    "description": "First profession dungeon (ancient overgrown mine) added.\n\nPremium: Homespun outfits, Buttons pet, emotes\nBitCraft news: https://bitcraftonline.com/news/patch-notes-roots-and-ruins\nBitcraft news 2: https://bitcraftonline.com/news/homespun-series-premium-cosmetics-crafted-in-comfort\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/541134950190023632"
+  },
+  {
+    "tag": "2026-04-16",
+    "label": "1.33 - Bloomfall Festival",
+    "description": "Added spring seasonal event, along with bees, peaches, and pies.\n\nPremium: Yukata outfits, Petal pet\nBitCraft news: https://bitcraftonline.com/news/patch-notes-bloomfall-festival\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/645845003826888958"
+  },
+  {
+    "tag": "2026-04-30",
+    "label": "1.34 - What the Buzz",
+    "description": "Added auric metal, more quests, plantable tree system changes.\n\nPremium: Soiree outfits, Party Supplies\nBitCraft news: https://bitcraftonline.com/news/patch-notes-what-the-buzz\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/683000875796398642"
+  }
+]
