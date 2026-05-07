@@ -11,23 +11,23 @@
   },
   {
     "tag": "2025-06-27",
-    "label": "EA1 Start",
+    "label": "1.00 - EA1 Start",
     "description": "First available data export for Early Access 1.\n\nThe first version of Early Access was released on June 21st, but technical issues and changes delayed data exports for a few days.\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731249563763089"
   },
   {
     "tag": "2025-07-02",
     "label": "1.01 - WASD, Claim Supply Balance",
-    "description": "The first weekly update for Early Access.\n\nA status update was posted on the website, and a preview build was released on Steam with WASD controls.\nBitCraft news: https://bitcraftonline.com/news/early-access-week-2\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731883551689643\nPatch notes: https://discord.com/channels/558439686083969035/879663330657206332/1390050681557221539\n\nNote: Version 1.02 is missing after this. It's possible they internally counted pushing the preview build to main as 1.02 due to some small changes.\nDiscord announcement: https://discord.com/channels/558439686083969035/1260246406963134496/1390410719379329165"
+    "description": "The first weekly update for Early Access.\n\nA status update was posted on the website, and a preview build was released on Steam introducing WASD controls.\nBitCraft news: https://bitcraftonline.com/news/early-access-week-2\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731883551689643\nPatch notes: https://discord.com/channels/558439686083969035/879663330657206332/1390050681557221539\n\nNote: Version 1.02 is missing after this. It's possible they internally counted pushing the preview build to main as 1.02 due to some small changes.\nDiscord announcement: https://discord.com/channels/558439686083969035/1260246406963134496/1390410719379329165"
   },
   {
     "tag": "2025-07-09",
     "label": "1.03",
-    "description": "Weekly update. Banks deconstructable again, settlement minimum range added.\n\nA preview client went out on the 8th, server changes arrived on the 9th along with a Discord announcement. Main Steam build and announcement went out on the 10th.\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1392539589645959279\nDiscord patch notes:https://discord.com/channels/558439686083969035/1260246406963134496/1392539315233620048\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731883551691561"
+    "description": "Weekly update. Banks deconstructable again, settlement minimum range added.\n\nA preview client went out on the 8th, server changes arrived on the 9th along with a Discord announcement. Main Steam build and announcement went out on the 10th.\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1392539589645959279\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1392539315233620048\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537731883551691561"
   },
   {
     "tag": "2025-07-17",
     "label": "1.04 - Tool Scrapping",
-    "description": "Added tool scrapping system and the Lusul pet.\n\nPreview client went out on the 16th, but most changes were server-side and arrived on the 17th.\nDiscord announcement (preview build): https://discord.com/channels/558439686083969035/879663330657206332/1395157049909837864\nDiscord patch notes (preview build): https://discord.com/channels/558439686083969035/1260246406963134496/1395156281676922950\nDiscord patch notes (main update): https://discord.com/channels/558439686083969035/1260246406963134496/1395436397003018250\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537733876590575720"
+    "description": "Added the tool scrapping system and the Lusul pet.\n\nPreview client went out on the 16th, but most changes were server-side and arrived on the 17th.\nDiscord announcement (preview build): https://discord.com/channels/558439686083969035/879663330657206332/1395157049909837864\nDiscord patch notes (preview build): https://discord.com/channels/558439686083969035/1260246406963134496/1395156281676922950\nDiscord patch notes (main update): https://discord.com/channels/558439686083969035/1260246406963134496/1395436397003018250\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537733876590575720"
   },
   {
     "tag": "2025-07-24",
@@ -37,7 +37,7 @@
   {
     "tag": "2025-07-31",
     "label": "1.06 - Star Stones",
-    "description": "Star stones from Hub Inventory Cubes were added, along with moving empire capitals and usurping.\n\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1400517017228017715\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1400510846232297604\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537735054151909515"
+    "description": "Star stones from Hub Inventory Cubes were added, along with moving empire capitals and usurping empires.\n\nDiscord announcement: https://discord.com/channels/558439686083969035/879663330657206332/1400517017228017715\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1400510846232297604\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/537735054151909515"
   },
   {
     "tag": "2025-08-07",
@@ -51,11 +51,11 @@
   {
     "tag": "2025-08-14",
     "label": "1.08 - Social",
-    "description": "Addition of the Social window, including friends and muted players.\n\nDiscord announcement (actually just patch notes): https://discord.com/channels/558439686083969035/879663330657206332/1405525965811224658\nDiscord patch notes (same content but the right channel): https://discord.com/channels/558439686083969035/1260246406963134496/1405526674723835984\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/824840894153752767"
+    "description": "Addition of the Social window, which includes friends (following) and muted players.\n\nDiscord announcement (actually just patch notes): https://discord.com/channels/558439686083969035/879663330657206332/1405525965811224658\nDiscord patch notes (same content but the right channel): https://discord.com/channels/558439686083969035/1260246406963134496/1405526674723835984\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/824840894153752767"
   },
   {
     "tag": "2025-08-25",
-    "description": "Client-only changed released August 21st for the weekly update (1.09). Combat update delayed, so no server changes.\nDiscord announcement regarding delay: https://discord.com/channels/558439686083969035/879663330657206332/1408427740830371881\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1407654050689847307\nSteam Post: https://steamcommunity.com/games/3454650/announcements/detail/537736957039476915"
+    "description": "Client-only changes released August 21st for the weekly update (1.09). Combat update delayed, so no server changes.\nDiscord announcement regarding delay: https://discord.com/channels/558439686083969035/879663330657206332/1408427740830371881\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1407654050689847307\nSteam Post: https://steamcommunity.com/games/3454650/announcements/detail/537736957039476915"
   },
   {
     "tag": "2025-09-02",
@@ -157,8 +157,8 @@
   },
   {
     "tag": "2026-02-05",
-    "label": "1.27 - Cocounuts and Companions",
-    "description": "Final content update for EA1.\n\nLots of quests added, including coconut hat, skiffs, and jakyl pets. Hexite meteor event also added.\nPremium: emotes\nBitCraft news: https://bitcraftonline.com/news/patch-notes-coconuts-and-companions\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/524241382256148892"
+    "label": "1.27 - Coconuts and Companions",
+    "description": "Final content update for Early Access 1.\n\nLots of quests added, including coconut hat, skiffs, and jakyl pets. Hexite meteor event also added.\nPremium: emotes\nBitCraft news: https://bitcraftonline.com/news/patch-notes-coconuts-and-companions\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/524241382256148892"
   },
   {
     "tag": "2026-02-25",
@@ -187,7 +187,7 @@
   {
     "tag": "2026-04-02",
     "label": "1.32 - Roots and Ruins",
-    "description": "First profession dungeon (ancient overgrown mine) added.\n\nPremium: Homespun outfits, Buttons pet, emotes\nBitCraft news: https://bitcraftonline.com/news/patch-notes-roots-and-ruins\nBitcraft news 2: https://bitcraftonline.com/news/homespun-series-premium-cosmetics-crafted-in-comfort\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/541134950190023632"
+    "description": "First profession dungeon (ancient overgrown mine) added.\n\nPremium: Homespun outfits, Buttons pet, emotes\nBitCraft news: https://bitcraftonline.com/news/patch-notes-roots-and-ruins\nBitCraft news 2: https://bitcraftonline.com/news/homespun-series-premium-cosmetics-crafted-in-comfort\nSteam post: https://steamcommunity.com/games/3454650/announcements/detail/541134950190023632"
   },
   {
     "tag": "2026-04-16",
