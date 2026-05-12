@@ -218,9 +218,8 @@ for (const tag of folders) {
             continue;
         }
         try {
-            const relPath = path.relative(dataRoot, folderPath).replace(/\\/g, "/");
-            execSync(`tsx scripts/generate-defs.ts ${relPath}`, {
-                cwd: dataRoot,
+            execSync(`tsx generate-defs.ts ${folderPath}`, {
+                cwd: __dirname,
                 stdio: "inherit",
             });
             // these should match generate-defs output since they are reading from the same annotations file

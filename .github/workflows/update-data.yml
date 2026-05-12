@@ -1,0 +1,136 @@
+name: Update Cereal Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      compress_patches:
+        description: 'Number of days to retain before compressing patches'
+        type: number
+        required: false
+        default: 10
+      force:
+        description: 'Skip staleness check for game-data'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-submodules:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: cereal
+      - name: Checkout cereal-data
+        uses: actions/checkout@v6
+        with:
+          repository: BitCraftToolBox/cereal-data
+          path: cereal-data
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+      - name: Checkout game data
+        uses: actions/checkout@v6
+        with:
+          repository: BitCraftToolBox/BitCraft_GameData
+          ref: cereal/cs
+          path: game-data
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Check game-data staleness
+        id: staleness-check
+        run: |
+          cd game-data
+          LATEST_COMMIT_TIMESTAMP=$(git log -1 --format=%cI)
+          LATEST_COMMIT_DATE=$(date -d "$LATEST_COMMIT_TIMESTAMP" +%s)
+          CURRENT_DATE=$(date +%s)
+          HOURS_OLD=$(( (CURRENT_DATE - LATEST_COMMIT_DATE) / 3600 ))
+          
+          echo "Latest commit: $LATEST_COMMIT_TIMESTAMP"
+          echo "Hours old: $HOURS_OLD"
+          
+          if [ $HOURS_OLD -gt 24 ] && [ "${{ inputs.force }}" != "true" ]; then
+            echo "ERROR: game-data is $HOURS_OLD hours old (> 24 hours) and force=false"
+            exit 1
+          elif [ $HOURS_OLD -gt 24 ]; then
+            echo "WARNING: game-data is $HOURS_OLD hours old, but force=true, proceeding anyway"
+          else
+            echo "game-data is up to date ($HOURS_OLD hours old)"
+          fi
+
+      - name: Copy files
+        id: copy-files
+        run: |
+          cd cereal-data
+          CURRENT_DATE=$(date -u +'%Y-%m-%d')
+          TARGET_FOLDER="data/${CURRENT_DATE}"
+          
+          # Check if base date folder exists
+          if [ -d "$TARGET_FOLDER" ]; then
+            # Find the highest patch number
+            HIGHEST_PATCH=1
+            for folder in data/${CURRENT_DATE}-*; do
+              if [ -d "$folder" ]; then
+                PATCH_NUM=$(echo "$folder" | sed "s/.*${CURRENT_DATE}-//")
+                if [[ "$PATCH_NUM" =~ ^[0-9]+$ ]] && [ "$PATCH_NUM" -gt "$HIGHEST_PATCH" ]; then
+                  HIGHEST_PATCH=$PATCH_NUM
+                fi
+              fi
+            done
+            NEXT_PATCH=$((HIGHEST_PATCH + 1))
+            TARGET_FOLDER="data/${CURRENT_DATE}-${NEXT_PATCH}"
+            echo "Base folder exists, using patch version: $TARGET_FOLDER"
+          else
+            echo "Using base date folder: $TARGET_FOLDER"
+          fi
+          
+          # Create target directory
+          mkdir -p "$TARGET_FOLDER"
+          
+          # Copy static directory
+          if [ -d "../game-data/static" ]; then
+            cp -r ../game-data/static "$TARGET_FOLDER/"
+            echo "Copied static/ to $TARGET_FOLDER/"
+          else
+            echo "Warning: static/ directory not found in game-data"
+          fi
+          
+          # Copy region_schema.json
+          if [ -f "../game-data/region_schema.json" ]; then
+            cp ../game-data/region_schema.json "$TARGET_FOLDER/"
+            echo "Copied region_schema.json to $TARGET_FOLDER/"
+          else
+            echo "Warning: region_schema.json not found in game-data"
+          fi
+          
+          # Store the target folder for later steps
+          echo "target_folder=$TARGET_FOLDER" >> $GITHUB_OUTPUT
+
+      - name: Run update-versions script
+        working-directory: cereal
+        run: |
+          npm ci
+          npx tsx scripts/update-versions.ts --root-dir ../cereal-data --compress-patches ${{ inputs.compress_patches }}
+
+      - name: Push changes
+        id: commit_push
+        working-directory: cereal-data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          
+          if ! git diff --cached --quiet; then
+            TARGET_FOLDER="${{ steps.copy-files.outputs.target_folder }}"
+            git commit -m "chore: update game data to ${TARGET_FOLDER#data/}"
+            git push origin
+            echo "changes_pushed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No updates"
+            echo "changes_pushed=false" >> $GITHUB_OUTPUT
+          fi
