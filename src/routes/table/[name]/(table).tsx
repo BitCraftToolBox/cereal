@@ -22,6 +22,46 @@ function ColumnStructure(props: { meta: ResolvedTableMeta; fks: ForeignKeyMappin
         return m;
     };
 
+    const schemaTable = () => {
+        const schema = data.getTypeContext()?.schema;
+        if (!schema) return undefined;
+        return schema.tables?.find((t) => t.name === props.tableName);
+    };
+
+    const columnIndex = (colName: string) => {
+        return props.meta.columns.indexOf(colName);
+    };
+
+    const hasUniqueConstraint = (colName: string) => {
+        const table = schemaTable();
+        if (!table?.constraints) return false;
+        const colIdx = columnIndex(colName);
+        return table.constraints.some((c) => c.data?.Unique?.columns?.includes(colIdx));
+    };
+
+    const getIndexInfo = (colName: string) => {
+        const table = schemaTable();
+        if (!table?.indexes) return undefined;
+        const colIdx = columnIndex(colName);
+        const matchingIndexes = table.indexes.filter((idx) => {
+            const cols = idx.algorithm?.BTree ?? idx.algorithm?.Hash ?? idx.algorithm?.Direct ?? [];
+            return Array.isArray(cols) ? cols.includes(colIdx) : cols === colIdx;
+        });
+        if (matchingIndexes.length === 0) return undefined;
+        
+        return matchingIndexes.map((idx) => {
+            const cols = idx.algorithm?.BTree ?? idx.algorithm?.Hash ?? idx.algorithm?.Direct ?? [];
+            if (typeof cols === 'number' || cols.length === 1) {
+                return { type: "single" as const, name: idx.accessor_name?.some ?? idx.name?.some };
+            } else if (cols.length > 1) {
+                const colNames = cols.map((i) => props.meta.columns[i]).filter(Boolean);
+                return { type: "multi" as const, name: idx.accessor_name?.some ?? idx.name?.some, columns: colNames };
+            }
+            // unknown index types should have been filtered by `matchingIndex` before so this *shouldn't* happen
+            return null;
+        }).filter((v: any): v is NonNullable<typeof v> => !!v);
+    };
+
     return (
         <div class="rounded-lg border border-border overflow-hidden">
             <table class="w-full text-sm">
@@ -38,13 +78,15 @@ function ColumnStructure(props: { meta: ResolvedTableMeta; fks: ForeignKeyMappin
                         const colFks = () => fksByCol().get(col) ?? [];
                         const colTypeRaw = () => data.getColumnType(props.tableName, col);
                         const ctx = () => data.getTypeContext();
+                        const indexInfo = () => getIndexInfo(col);
                         return (
                             <tr class="border-t border-border align-top">
                                 <td class="px-4 py-2 font-mono text-text">
                                     <div class="flex flex-wrap items-center gap-1">
                                         <Show when={col === props.meta.primaryKey}>
                                             <span
-                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted">PK</span>
+                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                title="Primary Key - always unique and indexed">PK</span>
                                         </Show>
                                         <Show when={enumVariants()}>
                                             <span
@@ -52,7 +94,30 @@ function ColumnStructure(props: { meta: ResolvedTableMeta; fks: ForeignKeyMappin
                                         </Show>
                                         <Show when={colFks().length > 0}>
                                             <span
-                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted">FK</span>
+                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                title="Foreign key">FK</span>
+                                        </Show>
+                                        <Show when={col !== props.meta.primaryKey && hasUniqueConstraint(col)}>
+                                            <span
+                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                title="Unique constraint">UNIQUE</span>
+                                        </Show>
+                                        <Show when={col !== props.meta.primaryKey}>
+                                            <For each={indexInfo()}>
+                                                {(idx) => (
+                                                    <Show when={idx.type === "multi"}
+                                                        fallback={
+                                                            <span
+                                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                                title={`Indexed on ${idx.name || "this column"}`}>IDX</span>
+                                                        }
+                                                    >
+                                                        <span
+                                                            class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted cursor-help"
+                                                            title={`Multi-column index ${idx.name}: ${(idx as any).columns?.join(", ")}`}>IDX*</span>
+                                                    </Show>
+                                                )}
+                                            </For>
                                         </Show>
                                         <span>{col}</span>
                                     </div>

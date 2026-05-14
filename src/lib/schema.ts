@@ -199,10 +199,31 @@ export interface ProductElement {
     algebraic_type: AlgebraicType;
 }
 
+export interface SchemaIndex {
+    name?: { some?: string };
+    accessor_name?: { some?: string };
+    algorithm: {
+        BTree?: number[];
+        Hash?: number[];
+        Direct?: number;
+    };
+}
+
+export interface SchemaConstraint {
+    name?: { some?: string };
+    data: {
+        Unique?: {
+            columns: number[];
+        };
+    };
+}
+
 export interface SchemaTable {
     name: string;
     product_type_ref: number;
     primary_key: number[];
+    indexes?: SchemaIndex[];
+    constraints?: SchemaConstraint[];
     table_access: { Public?: unknown[] } | { Private?: unknown[] };
 }
 
