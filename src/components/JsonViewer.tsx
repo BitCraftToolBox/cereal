@@ -34,7 +34,7 @@ export function JsonViewer(props: JsonViewerProps) {
             <Show when={props.copyable !== false}>
                 <button
                     onClick={copyJson}
-                    class="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-surface-2 hover:bg-surface-3 border border-border text-text-muted"
+                    class="absolute top-2 right-2 px-2 py-1 text-xs rounded-sm bg-surface-2 hover:bg-surface-3 border border-border text-text-muted"
                     aria-label="Copy JSON to clipboard"
                 >
                     {copied() ? "Copied!" : "Copy JSON"}
@@ -42,7 +42,7 @@ export function JsonViewer(props: JsonViewerProps) {
             </Show>
             <button
                 onClick={() => setForceExpanded((f) => f?.value === true ? {value: false} : {value: true})}
-                class="absolute top-2 right-24 px-2 py-1 text-xs rounded bg-surface-2 hover:bg-surface-3 border border-border text-text-muted"
+                class="absolute top-2 right-24 px-2 py-1 text-xs rounded-sm bg-surface-2 hover:bg-surface-3 border border-border text-text-muted"
                 aria-label={forceExpanded()?.value === true ? "Collapse all" : "Expand all"}
             >
                 {forceExpanded()?.value === true ? "Collapse all" : "Expand all"}

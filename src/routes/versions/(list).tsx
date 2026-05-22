@@ -63,7 +63,7 @@ export default function VersionsListPage() {
                                                     <span class="text-text-muted text-sm">{v.label}</span>
                                                 </Show>
                                                 <Show when={isCurrent()}>
-                                                    <span class="ml-1 text-xs bg-primary/20 text-primary border border-primary/30 rounded px-1.5 py-0.5 font-medium">
+                                                    <span class="ml-1 text-xs bg-primary/20 text-primary border border-primary/30 rounded-sm px-1.5 py-0.5 font-medium">
                                                         Current
                                                     </span>
                                                 </Show>

@@ -64,7 +64,7 @@ export function SpriteLink(props: { path: string; class?: string }) {
             <Show when={pos()}>
                 <Portal mount={document.body}>
                     <div
-                        class="fixed z-[9999] p-1 bg-surface-1 border border-border rounded shadow-lg pointer-events-none"
+                        class="fixed z-9999 p-1 bg-surface-1 border border-border rounded-sm shadow-lg pointer-events-none"
                         style={{left: `${pos()!.x + 12}px`, top: `${pos()!.y + 12}px`}}
                     >
                         <img

@@ -102,7 +102,7 @@ export default function ObjectView() {
                         <h1 class="text-2xl font-bold">{displayName()}</h1>
                         <A
                             href={`/graph/${params.name}/${params.id}`}
-                            class="text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
+                            class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
                             title="View reference graph for this object"
                         >
                             ⬡ graph

@@ -94,7 +94,7 @@ export function Breadcrumb() {
                                 <Show when={crumb.isEllipsis}>
                                     <button
                                         onClick={() => setExpanded(true)}
-                                        class="px-1 rounded hover:text-primary hover:bg-surface-2 transition-colors font-mono"
+                                        class="px-1 rounded-sm hover:text-primary hover:bg-surface-2 transition-colors font-mono"
                                         aria-label="Show full navigation history"
                                         title="Show all"
                                     >

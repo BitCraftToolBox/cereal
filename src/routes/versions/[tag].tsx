@@ -96,19 +96,19 @@ export default function VersionDetailPage() {
                 <div class="rounded-lg border border-border bg-surface-1 p-4 mb-4 flex flex-col gap-3">
                     <div class="flex items-center justify-between gap-2">
                         <Show when={prevVersion()} fallback={
-                            <button disabled class="flex-grow basis-0 px-3 py-1.5 rounded-md border border-border text-text-muted text-sm cursor-not-allowed opacity-50">← Previous</button>
+                            <button disabled class="grow basis-0 px-3 py-1.5 rounded-md border border-border text-text-muted text-sm cursor-not-allowed opacity-50">← Previous</button>
                         }>
                             {(prev) => (
                                 <A href={`/versions/${prev().tag}`} onclick={() => nav.updateTop(`📋 ${prev().tag}`, `/versions/${prev().tag}`)}
-                                   class="flex-grow basis-0 text-center px-3 py-1.5 rounded-md border border-border text-text hover:bg-surface-2 transition-colors text-sm">
+                                   class="grow basis-0 text-center px-3 py-1.5 rounded-md border border-border text-text hover:bg-surface-2 transition-colors text-sm">
                                     ← {prev().tag}
                                 </A>
                             )}
                         </Show>
-                        <div class="flex-grow flex justify-center gap-2">
+                        <div class="grow flex justify-center gap-2">
                             <label class="sr-only">Jump: </label>
                             <select
-                                class="max-w-[36ch] rounded-md border border-border bg-surface-2 text-text text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                                class="max-w-[36ch] rounded-md border border-border bg-surface-2 text-text text-sm px-2 py-1 focus:outline-hidden focus:ring-1 focus:ring-primary"
                                 value={params.tag}
                                 onKeyDown={handleSelectKey}
                                 onChange={(e) => {
@@ -128,11 +128,11 @@ export default function VersionDetailPage() {
                             </A>
                         </div>
                         <Show when={nextVersion()} fallback={
-                            <button disabled class="flex-grow basis-0 px-3 py-1.5 rounded-md border border-border text-text-muted text-sm cursor-not-allowed opacity-50">Next →</button>
+                            <button disabled class="grow basis-0 px-3 py-1.5 rounded-md border border-border text-text-muted text-sm cursor-not-allowed opacity-50">Next →</button>
                         }>
                             {(next) => (
                                 <A href={`/versions/${next().tag}`} onclick={() => nav.updateTop(`📋 ${next().tag}`, `/versions/${next().tag}`)}
-                                   class="flex-grow basis-0 text-center px-3 py-1.5 rounded-md border border-border text-text hover:bg-surface-2 transition-colors text-sm">
+                                   class="grow basis-0 text-center px-3 py-1.5 rounded-md border border-border text-text hover:bg-surface-2 transition-colors text-sm">
                                     {next().tag} →
                                 </A>
                             )}
@@ -160,7 +160,7 @@ export default function VersionDetailPage() {
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <h1 class="text-2xl font-bold font-mono">{v().tag}</h1>
                                         <Show when={isCurrent()}>
-                                            <span class="text-xs bg-primary/20 text-primary border border-primary/30 rounded px-1.5 py-0.5 font-medium">
+                                            <span class="text-xs bg-primary/20 text-primary border border-primary/30 rounded-sm px-1.5 py-0.5 font-medium">
                                                 Current
                                             </span>
                                         </Show>

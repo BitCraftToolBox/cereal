@@ -175,11 +175,11 @@ export function NetworkGraph(props: NetworkGraphProps) {
             <div
                 class="absolute top-3 left-3 z-10 flex flex-col gap-1 bg-surface-1/90 border border-border rounded-md px-3 py-2 text-xs text-text-muted pointer-events-none select-none">
                 <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded" style={`background:${PUBLIC_COLOR}`}/>
+                    <span class="w-3 h-3 rounded-sm" style={`background:${PUBLIC_COLOR}`}/>
                     public table
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded" style={`background:${HIDDEN_COLOR}`}/>
+                    <span class="w-3 h-3 rounded-sm" style={`background:${HIDDEN_COLOR}`}/>
                     hidden table
                 </div>
             </div>

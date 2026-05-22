@@ -10,10 +10,10 @@ export default function NotFound() {
             <span class="text-4xl" aria-hidden="true">🥣️</span>
             <div class="space-y-1">
                 <p class="text-lg font-semibold text-text">404</p>
-                <p class="text-sm text-text-muted font-mono max-w-xl break-words">Page not found</p>
+                <p class="text-sm text-text-muted font-mono max-w-xl wrap-break-word">Page not found</p>
             </div>
             <p class="text-text-muted text-sm max-w-sm">
-                <span class="font-mono bg-surface-2 px-2 py-0.5 rounded text-text border border-border">
+                <span class="font-mono bg-surface-2 px-2 py-0.5 rounded-sm text-text border border-border">
                     {location.pathname}
                 </span>
                 {" "}doesn't exist or may have been moved.

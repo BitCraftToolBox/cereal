@@ -15,7 +15,7 @@ function ErrorFallback(err: unknown, reset: () => void) {
             <span class="text-4xl" aria-hidden="true">⚠️</span>
             <div class="space-y-1">
                 <p class="text-lg font-semibold text-text">Something went wrong</p>
-                <p class="text-sm text-text-muted font-mono max-w-xl break-words">{message}</p>
+                <p class="text-sm text-text-muted font-mono max-w-xl wrap-break-word">{message}</p>
             </div>
             <button
                 class="px-4 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover transition-colors"

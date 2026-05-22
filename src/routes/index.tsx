@@ -85,13 +85,13 @@ export default function Home() {
                                 (e.currentTarget as HTMLInputElement).blur();
                             }
                         }}
-                        class="px-3 py-1.5 rounded-lg bg-surface-1 border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary text-sm w-56"
+                        class="px-3 py-1.5 rounded-lg bg-surface-1 border border-border text-text placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-primary text-sm w-56"
                         aria-label="Filter tables"
                     />
                     <p class="text-sm text-text-muted">{filteredTables().length} tables</p>
                     <A
                         href={`/graph`}
-                        class="text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
+                        class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
                         title="View network graph"
                     >
                         ⬡ graph

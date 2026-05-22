@@ -101,7 +101,7 @@ export default function TableGraph() {
                     <h1 class="text-xl font-bold font-mono">{params.name}</h1>
                     <A
                         href={`/table/${params.name}`}
-                        class="text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
+                        class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
                     >
                         ⊞ table
                     </A>

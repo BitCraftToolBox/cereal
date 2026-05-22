@@ -147,7 +147,7 @@ export default function SearchPage() {
                         type="search"
                         placeholder="Search tables, objects, IDs..."
                         onInput={(e) => handleInput(e.currentTarget.value)}
-                        class="w-full px-4 py-2.5 rounded-lg bg-surface-1 border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary text-base"
+                        class="w-full px-4 py-2.5 rounded-lg bg-surface-1 border border-border text-text placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-primary text-base"
                         aria-label="Search"
                     />
                     <kbd class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-muted hidden sm:inline">/</kbd>
@@ -174,9 +174,9 @@ export default function SearchPage() {
                                 {(match) => (
                                     <A
                                         href={`/table/${match.tableName}`}
-                                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-1 border border-border hover:border-primary hover:text-primary focus:border-primary focus:text-primary focus:outline-none transition-colors text-sm font-mono"
+                                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-1 border border-border hover:border-primary hover:text-primary focus:border-primary focus:text-primary focus:outline-hidden transition-colors text-sm font-mono"
                                     >
-                                        <span class="text-text-muted text-xs px-1.5 py-0.5 rounded bg-surface-2">
+                                        <span class="text-text-muted text-xs px-1.5 py-0.5 rounded-sm bg-surface-2">
                                           {match.category === "static" ? "📋" : match.category === "hidden" ? "🔒" : "⚙️"}
                                         </span>
                                         {match.tableName}
@@ -248,7 +248,7 @@ export default function SearchPage() {
                                                                         </span>
                                                                     </Show>
                                                                     <span
-                                                                        class="shrink-0 text-xs px-1.5 py-0.5 rounded bg-surface-2 text-text-muted font-mono"
+                                                                        class="shrink-0 text-xs px-1.5 py-0.5 rounded-sm bg-surface-2 text-text-muted font-mono"
                                                                         title="Match score (lower = better)"
                                                                     >
                                                                         {match.score === -1 ? "PK" : match.score.toFixed(1)}

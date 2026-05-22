@@ -64,7 +64,7 @@ export default function NetworkGraphPage() {
                 <h1 class="text-xl font-bold">Network Graph</h1>
                 <A
                     href="/"
-                    class="text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
+                    class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
                 >
                     ⊞ tables
                 </A>

@@ -160,7 +160,7 @@ export function Navbar() {
                     onFocus={() => {
                         if (searchQuery().trim()) setDropdownOpen(true);
                     }}
-                    class="w-full px-3 py-1.5 rounded-md bg-surface-2 border border-border text-text placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    class="w-full px-3 py-1.5 rounded-md bg-surface-2 border border-border text-text placeholder:text-text-muted text-sm focus:outline-hidden focus:ring-2 focus:ring-primary"
                     aria-label="Global search"
                     aria-autocomplete="list"
                     aria-expanded={hasSuggestions()}
@@ -291,7 +291,7 @@ export function Navbar() {
             value={versions.currentTag()}
             onKeyDown={(e) => handleSelectKey(e, e.currentTarget?.value)}
             onChange={(e) => selectVersion(e.currentTarget.value)}
-            class="px-2 py-1 rounded-md bg-surface-2 border border-border text-text text-sm w-full sm:w-auto focus:outline-none focus:ring-1 focus:ring-primary"
+            class="px-2 py-1 rounded-md bg-surface-2 border border-border text-text text-sm w-full sm:w-auto focus:outline-hidden focus:ring-1 focus:ring-primary"
             aria-label="Data version"
         >
             <Show when={versions.versions()} fallback={<option value="latest">Loading…</option>}>
@@ -316,7 +316,7 @@ export function Navbar() {
     );
 
     return (
-        <nav class="sticky top-0 z-50 bg-surface-1 border-b border-border shadow-sm" role="navigation" aria-label="Main navigation">
+        <nav class="sticky top-0 z-50 bg-surface-1 border-b border-border shadow-xs" role="navigation" aria-label="Main navigation">
             {/* Main bar */}
             <div class="max-w-7xl mx-auto px-4 flex items-center h-14 gap-4">
                 {/* Logo */}

@@ -6,7 +6,7 @@ export function TableNotFound(props: { name: string }) {
             <div class="text-5xl">🥣</div>
             <h1 class="text-2xl font-bold">Table not found</h1>
             <p class="text-text-muted text-sm">
-                <span class="font-mono bg-surface-2 px-2 py-0.5 rounded border border-border">{props.name}</span>
+                <span class="font-mono bg-surface-2 px-2 py-0.5 rounded-sm border border-border">{props.name}</span>
                 {" "}does not exist in this version of the data.
             </p>
             <A href="/"
@@ -24,7 +24,7 @@ export function ObjectNotFound(props: { name: string; id: string }) {
             <h1 class="text-2xl font-bold">Object not found</h1>
             <p class="text-text-muted text-sm">
                 No entry with id{" "}
-                <span class="font-mono bg-surface-2 px-2 py-0.5 rounded border border-border">{props.id}</span>
+                <span class="font-mono bg-surface-2 px-2 py-0.5 rounded-sm border border-border">{props.id}</span>
                 {" "}in{" "}
                 <A href={`/table/${props.name}`} class="font-mono underline hover:text-primary">{props.name}</A>.
             </p>

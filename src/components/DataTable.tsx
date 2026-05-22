@@ -600,7 +600,7 @@ export function DataTable(props: DataTableProps) {
                     placeholder={`Filter ${props.tableName}...`}
                     value={globalFilter()}
                     onInput={(e) => setGlobalFilter(e.currentTarget.value)}
-                    class="px-3 py-1.5 rounded-md bg-surface-2 border border-border text-text placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary flex-1 min-w-[200px] max-w-md"
+                    class="px-3 py-1.5 rounded-md bg-surface-2 border border-border text-text placeholder:text-text-muted text-sm focus:outline-hidden focus:ring-2 focus:ring-primary flex-1 min-w-[200px] max-w-md"
                     aria-label="Filter rows"
                 />
                 <span class="text-sm text-text-muted">
@@ -661,13 +661,13 @@ export function DataTable(props: DataTableProps) {
                             class="absolute right-0 top-full mt-1 z-20 min-w-[220px] p-3 bg-surface-1 border border-border rounded-lg shadow-lg space-y-2 text-sm">
                             <div class="flex gap-2 pb-2 border-b border-border">
                                 <button
-                                    class="flex-1 px-2 py-1 rounded bg-surface-2 hover:bg-surface-3 text-xs transition-colors"
+                                    class="flex-1 px-2 py-1 rounded-sm bg-surface-2 hover:bg-surface-3 text-xs transition-colors"
                                     onClick={() => table.getAllLeafColumns().filter((c) => c.id !== props.meta.primaryKey).forEach((c) => c.toggleVisibility(true))}
                                 >
                                     Select all
                                 </button>
                                 <button
-                                    class="flex-1 px-2 py-1 rounded bg-surface-2 hover:bg-surface-3 text-xs transition-colors"
+                                    class="flex-1 px-2 py-1 rounded-sm bg-surface-2 hover:bg-surface-3 text-xs transition-colors"
                                     onClick={() => table.getAllLeafColumns().filter((c) => c.id !== props.meta.primaryKey).forEach((c) => c.toggleVisibility(false))}
                                 >
                                     Deselect all
@@ -676,7 +676,7 @@ export function DataTable(props: DataTableProps) {
                             <div class="flex flex-col gap-1 max-h-72 overflow-y-auto">
                                 <For each={table.getAllLeafColumns().filter((c) => c.id !== props.meta.primaryKey)}>
                                     {(column) => (
-                                        <label class="flex items-center gap-2 cursor-pointer hover:text-text px-1 py-0.5 rounded hover:bg-surface-2">
+                                        <label class="flex items-center gap-2 cursor-pointer hover:text-text px-1 py-0.5 rounded-sm hover:bg-surface-2">
                                             <input
                                                 type="checkbox"
                                                 checked={column.getIsVisible()}
@@ -809,18 +809,18 @@ export function DataTable(props: DataTableProps) {
             <div class="flex items-center justify-between text-sm text-text-muted">
                 <div class="flex items-center gap-2">
                     <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}
-                            class="px-3 py-1 rounded border border-border hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                            class="px-3 py-1 rounded-sm border border-border hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed">
                         Previous
                     </button>
                     <button onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}
-                            class="px-3 py-1 rounded border border-border hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                            class="px-3 py-1 rounded-sm border border-border hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed">
                         Next
                     </button>
                 </div>
                 <span>Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</span>
                 <select value={table.getState().pagination.pageSize}
                         onChange={(e) => table.setPageSize(Number(e.currentTarget.value))}
-                        class="px-2 py-1 rounded bg-surface-2 border border-border" aria-label="Rows per page">
+                        class="px-2 py-1 rounded-sm bg-surface-2 border border-border" aria-label="Rows per page">
                     <For each={[...new Set([25, 50, 100, 250, table.getState().pagination.pageSize])].sort((a, b) => a - b)}>
                         {(size) => <option value={size}>{size} rows</option>}
                     </For>

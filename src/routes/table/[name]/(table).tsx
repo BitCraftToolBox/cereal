@@ -85,21 +85,21 @@ function ColumnStructure(props: { meta: ResolvedTableMeta; fks: ForeignKeyMappin
                                     <div class="flex flex-wrap items-center gap-1">
                                         <Show when={col === props.meta.primaryKey}>
                                             <span
-                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
                                                 title="Primary Key - always unique and indexed">PK</span>
                                         </Show>
                                         <Show when={enumVariants()}>
                                             <span
-                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted">enum</span>
+                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted">enum</span>
                                         </Show>
                                         <Show when={colFks().length > 0}>
                                             <span
-                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
                                                 title="Foreign key">FK</span>
                                         </Show>
                                         <Show when={col !== props.meta.primaryKey && hasUniqueConstraint(col)}>
                                             <span
-                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
                                                 title="Unique constraint">UNIQUE</span>
                                         </Show>
                                         <Show when={col !== props.meta.primaryKey}>
@@ -108,12 +108,12 @@ function ColumnStructure(props: { meta: ResolvedTableMeta; fks: ForeignKeyMappin
                                                     <Show when={idx.type === "multi"}
                                                         fallback={
                                                             <span
-                                                                class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted"
+                                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
                                                                 title={`Indexed on ${idx.name || "this column"}`}>IDX</span>
                                                         }
                                                     >
                                                         <span
-                                                            class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-text-muted cursor-help"
+                                                            class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted cursor-help"
                                                             title={`Multi-column index ${idx.name}: ${(idx as any).columns?.join(", ")}`}>IDX*</span>
                                                     </Show>
                                                 )}
@@ -127,7 +127,7 @@ function ColumnStructure(props: { meta: ResolvedTableMeta; fks: ForeignKeyMappin
                                                 {(fk) => (
                                                     <A
                                                         href={`/table/${fk.targetTable}`}
-                                                        class="text-xs px-1.5 py-0.5 rounded bg-surface-2 border border-border hover:border-primary hover:text-primary transition-colors font-mono"
+                                                        class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-2 border border-border hover:border-primary hover:text-primary transition-colors font-mono"
                                                         title={`${fk.sourceField} → ${fk.targetTable}.${fk.targetField ?? "id"}`}
                                                     >
                                                         → {fk.targetTable}
@@ -259,7 +259,7 @@ export default function TableView() {
                         <h1 class="text-2xl font-bold font-mono">{params.name}</h1>
                         <A
                             href={`/graph/${params.name}`}
-                            class="text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
+                            class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
                             title="View FK graph for this table"
                         >
                             ⬡ graph
@@ -269,18 +269,18 @@ export default function TableView() {
                         {(m) => (
                             <div class="flex gap-2 text-xs text-text-muted">
                                 <Show when={!m().isPublic}>
-                                    <span class="px-2 py-1 rounded bg-surface-2 border border-border"
+                                    <span class="px-2 py-1 rounded-sm bg-surface-2 border border-border"
                                           title="Private table — no data available">🔒 Private</span>
                                 </Show>
                                 <Show when={!isStaticTable(params.name)}>
                                     <span
-                                        class="px-2 py-1 rounded bg-surface-2 border border-border">⚙️ Non-static</span>
+                                        class="px-2 py-1 rounded-sm bg-surface-2 border border-border">⚙️ Non-static</span>
                                 </Show>
                                 <span
-                                    class="px-2 py-1 rounded bg-surface-2 border border-border">{m().columns.length} columns</span>
+                                    class="px-2 py-1 rounded-sm bg-surface-2 border border-border">{m().columns.length} columns</span>
                                 <Show when={m().rowCount > 0}>
                                     <span
-                                        class="px-2 py-1 rounded bg-surface-2 border border-border">{m().rowCount.toLocaleString()} rows</span>
+                                        class="px-2 py-1 rounded-sm bg-surface-2 border border-border">{m().rowCount.toLocaleString()} rows</span>
                                 </Show>
                             </div>
                         )}

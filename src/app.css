@@ -1,35 +1,72 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-surface-0: rgb(var(--color-surface-0));
+  --color-surface-1: rgb(var(--color-surface-1));
+  --color-surface-2: rgb(var(--color-surface-2));
+  --color-surface-3: rgb(var(--color-surface-3));
+
+  --color-primary: rgb(var(--color-primary));
+  --color-primary-hover: rgb(var(--color-primary-hover));
+
+  --color-text: rgb(var(--color-text));
+  --color-text-muted: rgb(var(--color-text-muted));
+
+  --color-border: rgb(var(--color-border));
+
+  --color-diff-added: rgb(var(--color-diff-added));
+  --color-diff-removed: rgb(var(--color-diff-removed));
+  --color-diff-modified: rgb(var(--color-diff-modified));
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 :root {
-    --color-surface-0: 255 255 255;
-    --color-surface-1: 248 249 250;
-    --color-surface-2: 233 236 239;
-    --color-surface-3: 222 226 230;
-    --color-primary: 79 70 229;
-    --color-primary-hover: 67 56 202;
-    --color-text: 26 26 46;
-    --color-text-muted: 107 114 128;
-    --color-border: 209 213 219;
-    --color-diff-added: 212 237 218;
-    --color-diff-removed: 248 215 218;
-    --color-diff-modified: 255 243 205;
+    --color-surface-0: rgb(255 255 255);
+    --color-surface-1: rgb(248 249 250);
+    --color-surface-2: rgb(233 236 239);
+    --color-surface-3: rgb(222 226 230);
+    --color-primary: rgb(79 70 229);
+    --color-primary-hover: rgb(67 56 202);
+    --color-text: rgb(26 26 46);
+    --color-text-muted: rgb(107 114 128);
+    --color-border: rgb(209 213 219);
+    --color-diff-added: rgb(212 237 218);
+    --color-diff-removed: rgb(248 215 218);
+    --color-diff-modified: rgb(255 243 205);
 }
 
 .dark {
-    --color-surface-0: 15 15 26;
-    --color-surface-1: 26 26 46;
-    --color-surface-2: 37 37 62;
-    --color-surface-3: 51 51 90;
-    --color-primary: 129 140 248;
-    --color-primary-hover: 99 102 241;
-    --color-text: 229 231 235;
-    --color-text-muted: 156 163 175;
-    --color-border: 55 65 81;
-    --color-diff-added: 26 58 42;
-    --color-diff-removed: 58 26 26;
-    --color-diff-modified: 58 58 26;
+    --color-surface-0: rgb(15 15 26);
+    --color-surface-1: rgb(26 26 46);
+    --color-surface-2: rgb(37 37 62);
+    --color-surface-3: rgb(51 51 90);
+    --color-primary: rgb(129 140 248);
+    --color-primary-hover: rgb(99 102 241);
+    --color-text: rgb(229 231 235);
+    --color-text-muted: rgb(156 163 175);
+    --color-border: rgb(55 65 81);
+    --color-diff-added: rgb(26 58 42);
+    --color-diff-removed: rgb(58 26 26);
+    --color-diff-modified: rgb(58 58 26);
 }
 
 html, body, #app {

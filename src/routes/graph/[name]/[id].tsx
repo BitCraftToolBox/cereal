@@ -130,11 +130,11 @@ export default function ObjectGraph() {
                         {" / "}{params.id}
                     </span>
                     <A href={`/table/${params.name}/${params.id}`}
-                       class="text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors">
+                       class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors">
                         ▣ object view
                     </A>
                     <A href={`/graph/${params.name}`}
-                       class="text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors">
+                       class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors">
                         ⬡ table graph
                     </A>
                     <Show when={loading()}><LoadingSpinner size="sm" label="Loading refs…"/></Show>
