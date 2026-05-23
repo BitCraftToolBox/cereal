@@ -71,9 +71,6 @@ export function Navbar() {
             vt(() => navigate(`/table/${result.tableName}`));
         } else {
             const path = `/table/${result.tableName}/${encodeURIComponent(String(result.primaryKey))}`;
-            const label = result.displayValue && result.displayValue !== String(result.primaryKey)
-                ? `▣ ${result.displayValue}`
-                : `▣ ${result.tableName} #${result.primaryKey}`;
             vt(() => navigate(path));
         }
     };
@@ -387,7 +384,7 @@ export function Navbar() {
                         <VersionSelect/>
                         <A
                             href={"/versions"}
-                            class="px-2 py-1 text-sm text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+                            class="px-2 py-1 text-sm text-nowrap text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
                             onClick={() => { setMenuOpen(false); }}
                         >
                             All versions

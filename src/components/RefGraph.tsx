@@ -58,14 +58,14 @@ function nodeSize(kind: GraphNode["kind"]) {
 }
 
 const KIND_COLOR: Record<GraphNode["kind"], string> = {
-    center: "hsl(var(--color-primary) / 1)",
+    center: "var(--color-primary)",
     outgoing: "hsl(220 70% 60% / 1)",
     incoming: "hsl(280 60% 65% / 1)",
     both: "hsl(160 60% 55% / 1)",
 };
 
 const KIND_BORDER: Record<GraphNode["kind"], string> = {
-    center: "hsl(var(--color-primary) / 0.8)",
+    center: "color-mix(in srgb, var(--color-primary) 80%, transparent)",
     outgoing: "hsl(220 70% 45% / 0.7)",
     incoming: "hsl(280 55% 50% / 0.7)",
     both: "hsl(160 55% 40% / 0.7)",
@@ -359,7 +359,7 @@ export function RefGraph(props: RefGraphProps) {
                             return (
                                 <g>
                                     <path d={edge.d} fill="none"
-                                          stroke={isHov() ? KIND_COLOR[edge.targetKind] : "hsl(var(--color-border) / 0.6)"}
+                                          stroke={isHov() ? KIND_COLOR[edge.targetKind] : "color-mix(in srgb, var(--color-border) 60%, transparent)"}
                                           stroke-width={isHov() ? 2 : 1.5}
                                           marker-end={`url(#${arrowMarkerId(edge.targetKind)})`}
                                           style="pointer-events:none"/>
@@ -381,10 +381,10 @@ export function RefGraph(props: RefGraphProps) {
                                 <g>
                                     <path
                                         d={`M ${e.x - hw * 0.5} ${e.y - hh} C ${e.x - hw * 1.8} ${e.y - hh * 3}, ${e.x + hw * 1.8} ${e.y - hh * 3}, ${e.x + hw * 0.5} ${e.y - hh}`}
-                                        fill="none" stroke="hsl(var(--color-primary) / 0.5)"
+                                        fill="none" stroke="color-mix(in srgb, var(--color-primary) 50%, transparent)"
                                         stroke-width={1.5} stroke-dasharray="4,3" style="pointer-events:none"/>
                                     <text x={e.x} y={e.y - hh * 3.3} text-anchor="middle" font-size="10"
-                                          fill="hsl(var(--color-primary) / 0.7)"
+                                          fill="color-mix(in srgb, var(--color-primary) 70%, transparent)"
                                           style="pointer-events:none;font-family:monospace">
                                         🔁 {e.label}
                                     </text>
@@ -416,7 +416,7 @@ export function RefGraph(props: RefGraphProps) {
                                     <title>{pos.id}</title>
                                     <rect
                                         x={-w / 2} y={-h / 2} width={w} height={h} rx={CORNER_R}
-                                        fill={`${KIND_COLOR[pos.kind]}${isHov() ? "cc" : "88"}`}
+                                        fill={`color-mix(in srgb, ${KIND_COLOR[pos.kind]} ${isHov() ? 80 : 53}%, transparent)`}
                                         stroke={KIND_BORDER[pos.kind]}
                                         stroke-width={isHov() ? 2.5 : isCenter ? 2 : 1.5}
                                     />
@@ -429,7 +429,7 @@ export function RefGraph(props: RefGraphProps) {
                                         text-anchor="middle"
                                         font-size={isCenter ? "13" : "11"}
                                         font-weight={isCenter ? "bold" : "normal"}
-                                        fill="hsl(var(--color-text) / 1)"
+                                         fill="var(--color-text)"
                                         style="pointer-events:none;font-family:monospace"
                                     >
                                         <For each={lines}>
@@ -461,12 +461,12 @@ export function RefGraph(props: RefGraphProps) {
                                         <rect
                                             x={mid().x - bw() / 2} y={mid().y - bh / 2}
                                             width={bw()} height={bh} rx={3}
-                                            fill="hsl(var(--color-surface-1) / 0.97)"
-                                            stroke="hsl(var(--color-border) / 0.7)" stroke-width={0.5}
+                                             fill="color-mix(in srgb, var(--color-surface-1) 97%, transparent)"
+                                             stroke="color-mix(in srgb, var(--color-border) 70%, transparent)" stroke-width={0.5}
                                         />
                                         <text x={mid().x} y={mid().y} text-anchor="middle"
                                               dominant-baseline="middle" font-size="10"
-                                              fill="hsl(var(--color-text-muted) / 1)"
+                                               fill="var(--color-text-muted)"
                                               style="font-family:monospace">
                                             {edge.label}
                                         </text>
