@@ -13,7 +13,7 @@
  *  4. Writes the updated public/versions.json.
  *
  * Usage:
- *   tsx scripts/update-versions.ts [--compress-patches <N>]
+ *   tsx scripts/update-versions.ts [--compress-patches <N>] [--annotations-only]
  */
 
 import fs from "node:fs";
@@ -31,6 +31,7 @@ const ANNOTATIONS = path.resolve(__dirname, "version_annotations.json");
 const args = process.argv.slice(2);
 let compressPatchesDays: number | null = null;
 let dataRoot = path.resolve(__dirname, "..", "public");
+let annotationsOnly = false;
 for (let i = 0; i < args.length; i++) {
     if (args[i] === "--compress-patches" && args[i + 1]) {
         compressPatchesDays = parseInt(args[i + 1], 10);
@@ -38,6 +39,8 @@ for (let i = 0; i < args.length; i++) {
     } else if (args[i] === "--root-dir" && args[i + 1]) {
         dataRoot = path.resolve(args[i + 1]);
         i++;
+    } else if (args[i] === "--annotations-only") {
+        annotationsOnly = true;
     }
 }
 
@@ -76,93 +79,97 @@ const annotationsByTag = new Map<string, VersionEntry>(annotations.map((v) => [v
 // 2. Compress patches (optional)
 // ---------------------------------------------------------------------------
 if (compressPatchesDays !== null) {
-    console.log(`\nCompressing patch versions older than ${compressPatchesDays} days...`);
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - compressPatchesDays);
+    if (annotationsOnly) {
+        console.log("--annotations-only: skipping patch compression.");
+    } else {
+        console.log(`\nCompressing patch versions older than ${compressPatchesDays} days...`);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - compressPatchesDays);
 
-    // Group all folders by base date (YYYY-MM-DD)
-    const allFolders = fs.readdirSync(DATA_DIR).filter((f) =>
-        /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(f) && fs.statSync(path.join(DATA_DIR, f)).isDirectory()
-    );
+        // Group all folders by base date (YYYY-MM-DD)
+        const allFolders = fs.readdirSync(DATA_DIR).filter((f) =>
+            /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(f) && fs.statSync(path.join(DATA_DIR, f)).isDirectory()
+        );
 
-    const byBase = new Map<string, string[]>();
-    for (const folder of allFolders) {
-        const baseMatch = folder.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (!baseMatch) continue;
-        const base = baseMatch[1];
-        const existing = byBase.get(base) ?? [];
-        existing.push(folder);
-        byBase.set(base, existing);
-    }
-
-    for (const [base, folders] of byBase) {
-        if (folders.length <= 1) continue; // no patches to compress
-        const [y, m, d] = base.split("-").map(Number);
-        const folderDate = new Date(y, m - 1, d);
-        if (folderDate >= cutoffDate) {
-            console.log(`  Skipping ${base} (within ${compressPatchesDays}-day window)`);
-            continue;
+        const byBase = new Map<string, string[]>();
+        for (const folder of allFolders) {
+            const baseMatch = folder.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (!baseMatch) continue;
+            const base = baseMatch[1];
+            const existing = byBase.get(base) ?? [];
+            existing.push(folder);
+            byBase.set(base, existing);
         }
 
-        // Sort: base folder first, then by patch number ascending
-        folders.sort((a, b) => {
-            const pa = parseInt(a.match(/-(\d+)$/)?.[1] ?? "0", 10);
-            const pb = parseInt(b.match(/-(\d+)$/)?.[1] ?? "0", 10);
-            return pa - pb;
-        });
-
-        const highest = folders[folders.length - 1];
-        const toDelete = folders.slice(0, -1); // all except the highest
-
-        console.log(`  Compressing ${base}: keeping ${highest}, deleting ${toDelete.join(", ")}`);
-
-        // Merge label/description: prefer one from any entry that has it
-        const highestEntry = manifestByTag.get(highest);
-        let mergedLabel = highestEntry?.label;
-        let mergedDesc = highestEntry?.description;
-        for (const tag of toDelete) {
-            const e = manifestByTag.get(tag);
-            if (!mergedLabel && e?.label && e.label !== tag) mergedLabel = e.label;
-            if (!mergedDesc && e?.description) mergedDesc = e.description;
-        }
-
-        // Delete old folders and their manifest entries
-        for (const tag of toDelete) {
-            const folderPath = path.join(DATA_DIR, tag);
-            fs.rmSync(folderPath, {recursive: true, force: true});
-            manifestByTag.delete(tag);
-            console.log(`    Deleted ${folderPath}`);
-        }
-
-        const newLabel = annotationsByTag.get(base)?.label ?? mergedLabel;
-        const newDesc = annotationsByTag.get(base)?.description ?? mergedDesc;
-
-        // Rename highest to base date
-        if (highest !== base) {
-            const oldPath = path.join(DATA_DIR, highest);
-            const newPath = path.join(DATA_DIR, base);
-            fs.renameSync(oldPath, newPath);
-            // Rename the version file inside too
-            const oldVersionFile = path.join(newPath, `version_${highest}.json`);
-            const newVersionFile = path.join(newPath, `version_${base}.json`);
-            if (fs.existsSync(oldVersionFile)) {
-                const vData = JSON.parse(fs.readFileSync(oldVersionFile, "utf-8"));
-                vData.tag = base;
-                vData.label = newLabel;
-                vData.description = newDesc;
-                fs.writeFileSync(newVersionFile, JSON.stringify(vData, null, 2), "utf-8");
-                fs.unlinkSync(oldVersionFile);
+        for (const [base, folders] of byBase) {
+            if (folders.length <= 1) continue; // no patches to compress
+            const [y, m, d] = base.split("-").map(Number);
+            const folderDate = new Date(y, m - 1, d);
+            if (folderDate >= cutoffDate) {
+                console.log(`  Skipping ${base} (within ${compressPatchesDays}-day window)`);
+                continue;
             }
-            manifestByTag.delete(highest);
-            console.log(`    Renamed ${oldPath} -> ${newPath}`);
-        }
 
-        // Update manifest entry for base
-        manifestByTag.set(base, {
-            tag: base,
-            label: newLabel,
-            description: newDesc,
-        });
+            // Sort: base folder first, then by patch number ascending
+            folders.sort((a, b) => {
+                const pa = parseInt(a.match(/-(\d+)$/)?.[1] ?? "0", 10);
+                const pb = parseInt(b.match(/-(\d+)$/)?.[1] ?? "0", 10);
+                return pa - pb;
+            });
+
+            const highest = folders[folders.length - 1];
+            const toDelete = folders.slice(0, -1); // all except the highest
+
+            console.log(`  Compressing ${base}: keeping ${highest}, deleting ${toDelete.join(", ")}`);
+
+            // Merge label/description: prefer one from any entry that has it
+            const highestEntry = manifestByTag.get(highest);
+            let mergedLabel = highestEntry?.label;
+            let mergedDesc = highestEntry?.description;
+            for (const tag of toDelete) {
+                const e = manifestByTag.get(tag);
+                if (!mergedLabel && e?.label && e.label !== tag) mergedLabel = e.label;
+                if (!mergedDesc && e?.description) mergedDesc = e.description;
+            }
+
+            // Delete old folders and their manifest entries
+            for (const tag of toDelete) {
+                const folderPath = path.join(DATA_DIR, tag);
+                fs.rmSync(folderPath, {recursive: true, force: true});
+                manifestByTag.delete(tag);
+                console.log(`    Deleted ${folderPath}`);
+            }
+
+            const newLabel = annotationsByTag.get(base)?.label ?? mergedLabel;
+            const newDesc = annotationsByTag.get(base)?.description ?? mergedDesc;
+
+            // Rename highest to base date
+            if (highest !== base) {
+                const oldPath = path.join(DATA_DIR, highest);
+                const newPath = path.join(DATA_DIR, base);
+                fs.renameSync(oldPath, newPath);
+                // Rename the version file inside too
+                const oldVersionFile = path.join(newPath, `version_${highest}.json`);
+                const newVersionFile = path.join(newPath, `version_${base}.json`);
+                if (fs.existsSync(oldVersionFile)) {
+                    const vData = JSON.parse(fs.readFileSync(oldVersionFile, "utf-8"));
+                    vData.tag = base;
+                    vData.label = newLabel;
+                    vData.description = newDesc;
+                    fs.writeFileSync(newVersionFile, JSON.stringify(vData, null, 2), "utf-8");
+                    fs.unlinkSync(oldVersionFile);
+                }
+                manifestByTag.delete(highest);
+                console.log(`    Renamed ${oldPath} -> ${newPath}`);
+            }
+
+            // Update manifest entry for base
+            manifestByTag.set(base, {
+                tag: base,
+                label: newLabel,
+                description: newDesc,
+            });
+        }
     }
 }
 
@@ -211,6 +218,10 @@ for (const tag of folders) {
         }
     } else {
         // Need to generate defs for this version
+        if (annotationsOnly) {
+            console.log(`  Skipping ${tag}: no version file (--annotations-only, not generating)`);
+            continue;
+        }
         console.log(`  Generating defs for ${tag}...`);
         const staticDir = path.join(folderPath, "static");
         if (!fs.existsSync(staticDir)) {

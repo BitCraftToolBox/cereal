@@ -1,0 +1,47 @@
+name: Update Version Annotations
+
+on:
+  push:
+    paths:
+      - 'scripts/version_annotations.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-annotations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: cereal
+      - name: Checkout cereal-data
+        uses: actions/checkout@v6
+        with:
+          repository: BitCraftToolBox/cereal-data
+          path: cereal-data
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Run update-versions script (annotations only)
+        working-directory: cereal
+        run: |
+          npm ci
+          npx tsx scripts/update-versions.ts --root-dir ../cereal-data --annotations-only
+
+      - name: Push changes
+        working-directory: cereal-data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update version annotations"
+            git push origin
+            echo "Pushed annotation updates"
+          else
+            echo "No annotation changes to push"
+          fi
