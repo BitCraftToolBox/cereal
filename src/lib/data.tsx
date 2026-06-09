@@ -4,7 +4,7 @@ import {DATA_CDN_BASE} from "./constants";
 import {
     type AlgebraicType,
     buildTypeIndexMap,
-    type DefManifest,
+    type DefManifest, EnumDef,
     type ForeignKeyMapping,
     getColumnTypeElement,
     type SearchIndex,
@@ -117,7 +117,11 @@ export const DataProvider: ParentComponent = (props) => {
     };
 
     function createVersionedStore(tagSignal: Accessor<string>): DataStore {
-        const [manifest] = createResource(tagSignal, async (ver): Promise<DefManifest | null> => {
+        // Load (and cache) a manifest for an *explicit* version, independent of the reactive
+        // `tagSignal`. Used both by the reactive `manifest` resource and by version-explicit
+        // display-name resolution, so async work always targets the right version's manifest
+        // instead of whatever `manifest()` transiently happens to be mid-version-switch.
+        async function loadManifest(ver: string): Promise<DefManifest | null> {
             // "__pending__" is the placeholder before real versions load — skip fetching
             if (!ver || ver === "__pending__") return null;
             if (caches.manifests.has(ver)) return caches.manifests.get(ver)!;
@@ -140,7 +144,9 @@ export const DataProvider: ParentComponent = (props) => {
             })();
             caches.inFlightManifests.set(ver, promise);
             return promise;
-        });
+        }
+
+        const [manifest] = createResource(tagSignal, loadManifest);
 
         const [schema] = createResource(tagSignal, async (ver): Promise<SpacetimeDBSchema | null> => {
             if (!ver || ver === "__pending__") return null;
@@ -221,16 +227,20 @@ export const DataProvider: ParentComponent = (props) => {
             return map;
         }
 
-        function resolveEnumValues(meta: TableMeta): Record<string, string[]> {
-            const m = manifest();
-            if (!m) return {};
-            const enumMap = new Map((m.enums ?? []).map((e) => [e.name, e.values]));
+        function resolveEnums(defs: EnumDef[], vals: Record<string, string>) {
+            const enumMap = new Map((defs ?? []).map((e) => [e.name, e.values]));
             const ev: Record<string, string[]> = {};
-            for (const [col, enumName] of Object.entries(meta.enumValues)) {
+            for (const [col, enumName] of Object.entries(vals)) {
                 const v = enumMap.get(enumName);
                 if (v) ev[col] = v;
             }
             return ev;
+        }
+
+        function resolveEnumValues(meta: TableMeta): Record<string, string[]> {
+            const m = manifest();
+            if (!m) return {};
+            return resolveEnums(m.enums, meta.enumValues);
         }
 
         function getTableMeta(name: string): ResolvedTableMeta | undefined {
@@ -268,38 +278,45 @@ export const DataProvider: ParentComponent = (props) => {
             return map;
         });
 
-        async function fetchTable(name: string): Promise<Record<string, unknown>[]> {
-            const ver = tagSignal();
-            let vCache = caches.tables.get(ver);
-            if (!vCache) {
-                vCache = new Map();
-                caches.tables.set(ver, vCache);
-            }
-            if (vCache.has(name)) return vCache.get(name)!;
+        /** Tables that get synthetic display names assembled from other tables. */
+        const syntheticDisplayNameTables = new Set(["extraction_recipe_desc"]);
 
-            let res: Response;
-            try {
-                res = await fetch(`${DATA_CDN_BASE}/data/${ver}/static/${name}.json`);
-            } catch (e) {
-                throw new Error(`[cereal] Network error fetching "${name}": ${e}`);
-            }
-            if (!res.ok) throw new Error(`[cereal] HTTP ${res.status} fetching "${name}"`);
+        /**
+         * Resolve table meta for an *explicit* version, awaiting that version's manifest.
+         * Unlike `getTableMeta`, this never reads the reactive `manifest()` accessor, so it
+         * can't resolve against `undefined` (mid-load) or the wrong (previous) version while
+         * async work for `ver` is still in flight.
+         */
+        async function metaForVersion(ver: string, name: string): Promise<ResolvedTableMeta | undefined> {
+            const m = await loadManifest(ver);
+            const meta = m?.tables.find((t) => t.name === name);
+            if (!m || !meta) return undefined;
+            return {...meta, enumValues: resolveEnums(m.enums, meta.enumValues)};
+        }
 
-            let rows: Record<string, unknown>[];
-            try {
-                rows = (await res.json()) as Record<string, unknown>[];
-            } catch (e) {
-                throw new Error(`[cereal] Failed to parse JSON for "${name}": ${e}`);
-            }
-            vCache.set(name, rows);
+        /**
+         * Ensure the display-name map for `(ver, name)` exists. Idempotent and
+         * version-explicit, so it's safe to call even when rows came from cache — which is
+         * exactly the case that previously left the cache permanently missing names: a version
+         * first fetched while its manifest was mid-switch would skip name population, cache its
+         * rows, and never retry. Awaiting the version's manifest removes that timing dependency.
+         */
+        async function ensureDisplayNames(ver: string, name: string, rows: Record<string, unknown>[]) {
+            // Already populated (or async resolution already kicked off) for this version.
+            if (caches.displayNames.get(ver)?.has(name)) return;
 
-            const meta = getTableMeta(name);
-            if (meta?.primaryKey && meta.displayField) {
-                let dnVersionMap = caches.displayNames.get(ver);
-                if (!dnVersionMap) {
-                    dnVersionMap = new Map();
-                    caches.displayNames.set(ver, dnVersionMap);
-                }
+            const meta = await metaForVersion(ver, name);
+            if (!meta?.primaryKey) return;
+
+            let dnVersionMap = caches.displayNames.get(ver);
+            if (!dnVersionMap) {
+                dnVersionMap = new Map();
+                caches.displayNames.set(ver, dnVersionMap);
+            }
+            // Re-check after the await — another caller may have populated it meanwhile.
+            if (dnVersionMap.has(name)) return;
+
+            if (meta.displayField) {
                 const map = new Map<string, string>();
                 for (const row of rows) {
                     const pk = String(row[meta.primaryKey]);
@@ -307,33 +324,66 @@ export const DataProvider: ParentComponent = (props) => {
                     if (label) map.set(pk, String(label));
                 }
                 dnVersionMap.set(name, map);
-                caches.bumpDisplayNameVersion();
 
                 if (name === "crafting_recipe_desc") {
                     resolveCraftingRecipeNames(ver, rows, meta.primaryKey, map)
                         .then(() => caches.bumpDisplayNameVersion())
-                        .catch(() => {/* non-fatal */});
+                        .catch(() => {});
                 }
+                return;
             }
 
-            const syntheticDisplayNameTables = new Set(["extraction_recipe_desc"]);
-            // Tables that need synthetic display names but have no displayField get their own
-            // resolver block. The map is created here so resolvers can populate it freely.
-            if (meta?.primaryKey && syntheticDisplayNameTables.has(name)) {
-                let dnVersionMap = caches.displayNames.get(ver);
-                if (!dnVersionMap) {
-                    dnVersionMap = new Map();
-                    caches.displayNames.set(ver, dnVersionMap);
-                }
-                const map = dnVersionMap.get(name) ?? new Map<string, string>();
+            // Tables that need synthetic display names but have no displayField. The map is
+            // created here so resolvers can populate it freely.
+            if (syntheticDisplayNameTables.has(name)) {
+                const map = new Map<string, string>();
                 dnVersionMap.set(name, map);
                 if (name === "extraction_recipe_desc") {
                     resolveExtractionRecipeNames(ver, rows, meta.primaryKey, map)
                         .then(() => caches.bumpDisplayNameVersion())
-                        .catch(() => {/* non-fatal */
-                        });
+                        .catch(() => {});
                 }
             }
+        }
+
+        async function fetchTable(name: string): Promise<Record<string, unknown>[]> {
+            return fetchTableFor(tagSignal(), name);
+        }
+
+        /**
+         * Version-explicit row fetch + display-name population. All async name resolution flows
+         * through here with an explicit `ver`, so dependent-table fetches (e.g. resource_desc
+         * for extraction recipes) always target the same version as the rows being resolved —
+         * never whatever `tagSignal()` happens to be by the time the promise runs.
+         */
+        async function fetchTableFor(ver: string, name: string): Promise<Record<string, unknown>[]> {
+            let vCache = caches.tables.get(ver);
+            if (!vCache) {
+                vCache = new Map();
+                caches.tables.set(ver, vCache);
+            }
+
+            let rows = vCache.get(name);
+            if (!rows) {
+                let res: Response;
+                try {
+                    res = await fetch(`${DATA_CDN_BASE}/data/${ver}/static/${name}.json`);
+                } catch (e) {
+                    throw new Error(`[cereal] Network error fetching "${name}": ${e}`);
+                }
+                if (!res.ok) throw new Error(`[cereal] HTTP ${res.status} fetching "${name}"`);
+
+                try {
+                    rows = (await res.json()) as Record<string, unknown>[];
+                } catch (e) {
+                    throw new Error(`[cereal] Failed to parse JSON for "${name}": ${e}`);
+                }
+                vCache.set(name, rows);
+            }
+
+            // Always ensure display names — even when rows came from cache — so a version first
+            // fetched before its manifest/deps were ready doesn't stay stuck without names.
+            await ensureDisplayNames(ver, name, rows);
             return rows;
         }
 
@@ -343,7 +393,7 @@ export const DataProvider: ParentComponent = (props) => {
             primaryKey: string,
             map: Map<string, string>,
         ) {
-            await Promise.all([fetchTable("item_desc").catch(() => []), fetchTable("cargo_desc").catch(() => [])]);
+            await Promise.all([fetchTableFor(ver, "item_desc").catch(() => []), fetchTableFor(ver, "cargo_desc").catch(() => [])]);
             const dnVer = caches.displayNames.get(ver);
             const itemById = dnVer?.get("item_desc") ?? new Map<string, string>();
             const cargoById = dnVer?.get("cargo_desc") ?? new Map<string, string>();
@@ -372,7 +422,7 @@ export const DataProvider: ParentComponent = (props) => {
             primaryKey: string,
             map: Map<string, string>,
         ) {
-            await fetchTable("resource_desc").catch(() => []);
+            await fetchTableFor(ver, "resource_desc").catch(() => []);
             const resourceById = caches.displayNames.get(ver)?.get("resource_desc") ?? new Map<string, string>();
             for (const row of rows) {
                 const resourceId = String(row["resource_id"] ?? "");

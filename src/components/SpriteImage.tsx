@@ -70,7 +70,7 @@ export function SpriteLink(props: { path: string; class?: string }) {
                         <img
                             src={currentUrl()}
                             alt={props.path}
-                            class="max-w-[128px] max-h-[128px] object-contain"
+                            class="max-w-32 max-h-32 object-contain"
                             style="image-rendering: crisp-edges"
                         />
                     </div>

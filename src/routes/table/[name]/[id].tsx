@@ -70,7 +70,7 @@ export default function ObjectView() {
 
     return (
         <div class="w-full min-w-[min(67vw,100%)] mx-auto space-y-6">
-            <Title>{displayName()} — {params.name} — cereal</Title>
+            <Title>{`${displayName()} — ${params.name} — cereal`}</Title>
 
             <Show when={tableNotFound()}>
                 <TableNotFound name={params.name}/>

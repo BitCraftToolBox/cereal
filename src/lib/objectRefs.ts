@@ -92,9 +92,11 @@ export function createObjectRow(
         const m = meta();
         const id = objectId();
         const name = tableName();
+        // early reactive tracking
+        const nameMap = data.getDisplayNames(name);
         if (!r || !m) return `${name} #${id}`;
         const pk = String(r[m.primaryKey!] ?? id);
-        const cached = data.getDisplayNames(name)?.get(pk);
+        const cached = nameMap?.get(pk);
         if (cached) return cached;
         return `${name} #${pk}`;
     });

@@ -128,7 +128,7 @@ export default function Home() {
                                     class="block p-4 rounded-lg bg-surface-1 border border-border hover:border-primary hover:shadow-md transition-all group"
                                 >
                                     <div
-                                        class="font-medium font-mono text-text group-hover:text-primary transition-colors">
+                                        class="font-medium font-mono text-text group-hover:text-primary transition-colors truncate">
                                         {table.name}
                                     </div>
                                     <div class="flex items-center gap-3 mt-2 text-xs text-text-muted">

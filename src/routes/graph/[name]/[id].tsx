@@ -112,7 +112,7 @@ export default function ObjectGraph() {
 
     return (
         <div class="flex flex-col flex-1 min-h-0 gap-3">
-            <Title>{displayName()} graph — cereal</Title>
+            <Title>{`${displayName()} graph — cereal`}</Title>
 
             <Show when={tableNotFound()}>
                 <TableNotFound name={params.name}/>

@@ -90,7 +90,7 @@ export default function VersionDetailPage() {
 
     return (
         <>
-            <Title>{params.tag} — Versions — cereal</Title>
+            <Title>{`${params.tag} — Versions — cereal`}</Title>
             <div class="max-w-3xl w-full mx-auto py-6">
                 {/* Navigation panel */}
                 <div class="rounded-lg border border-border bg-surface-1 p-4 mb-4 flex flex-col gap-3">

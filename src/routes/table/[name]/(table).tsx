@@ -119,7 +119,7 @@ export default function TableView() {
 
     return (
         <div class="w-full min-w-[min(67vw,100%)] mx-auto space-y-6">
-            <Title>{params.name} — cereal</Title>
+            <Title>{`${params.name} — cereal`}</Title>
 
             <Show when={tableNotFound()}>
                 <TableNotFound name={params.name}/>

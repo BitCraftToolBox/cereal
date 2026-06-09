@@ -14,7 +14,7 @@ export default function VersionCompareView() {
     const [loadRows, setLoadRows] = createSignal(true);
 
     createEffect(() => {
-        nav.push({path: `/compare`, label: `⇄ Compare`});
+        nav.push({path: `/compare?from=${cmp.fromTag()}&to=${cmp.toTag()}`, label: `⇄ Compare`});
     });
 
     const fromManifest = () => cmp.fromStore.manifest();

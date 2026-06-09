@@ -429,7 +429,7 @@ export function RefGraph(props: RefGraphProps) {
                                         text-anchor="middle"
                                         font-size={isCenter ? "13" : "11"}
                                         font-weight={isCenter ? "bold" : "normal"}
-                                         fill="var(--color-text)"
+                                        fill="var(--color-text)"
                                         style="pointer-events:none;font-family:monospace"
                                     >
                                         <For each={lines}>
@@ -466,7 +466,7 @@ export function RefGraph(props: RefGraphProps) {
                                         />
                                         <text x={mid().x} y={mid().y} text-anchor="middle"
                                               dominant-baseline="middle" font-size="10"
-                                               fill="var(--color-text-muted)"
+                                              fill="var(--color-text-muted)"
                                               style="font-family:monospace">
                                             {edge.label}
                                         </text>

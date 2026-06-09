@@ -45,7 +45,7 @@ export default function ObjectCompareView() {
     const highlights = createMemo(() => diffObject(from.row(), to.row()));
 
     createEffect(() => {
-        nav.push({path: `/compare/${params.name}/${params.id}`, label: `⇄ ${to.displayName()}`});
+        nav.push({path: `/compare/${params.name}/${params.id}?from=${cmp.fromTag()}&to=${cmp.toTag()}`, label: `⇄ ${to.displayName()}`});
     });
 
     const loading = () => from.rows.loading || to.rows.loading;
@@ -54,7 +54,7 @@ export default function ObjectCompareView() {
         <div class="flex-1 min-w-0 space-y-2">
             <h2 class="text-sm font-semibold text-text-muted">
                 <p class="text-sm text-text-muted">{p.label} <span class="font-mono text-text">
-                    <Show when={p.view.row} fallback={p.tag}>
+                    <Show when={p.view.row()} keyed fallback={p.tag}>
                         <A href={`/table/${params.name}/${params.id}?version=${p.tag}`}>▣ {p.view.displayName() ?? params.id} @ {p.tag}</A>
                     </Show>
                 </span></p>
@@ -83,7 +83,7 @@ export default function ObjectCompareView() {
 
     return (
         <div class="w-full mx-auto space-y-6">
-            <Title>⇄ {params.name} / {to.displayName() ?? params.id} — cereal</Title>
+            <Title>{`⇄ ${params.name} / ${to.displayName()} — cereal`}</Title>
             <CompareHeader title={
                 <>
                     <A href={`/compare/?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>Compare</A>
@@ -95,9 +95,15 @@ export default function ObjectCompareView() {
             <Show when={!loading()} fallback={<div class="flex justify-center py-16"><LoadingSpinner size="lg" label="Loading…"/></div>}>
                 <Show
                     when={highlights().size > 0 || !from.row() || !to.row()}
-                    fallback={<div class="p-4 rounded-lg bg-surface-1 border border-border text-sm text-text-muted">
-                        No differences between these versions.
-                    </div>}
+                    fallback={
+                        <div class="flex flex-col items-center p-4 rounded-lg bg-surface-1 border border-border text-sm text-text-muted">
+                            <p>No differences between these versions.</p>
+                            <div class="flex flex-row gap-4">
+                                <A href={`/table/${params.name}/${params.id}?version=${cmp.fromTag()}`}>▣ {from.displayName()} @ {cmp.fromTag()}</A>
+                                <A href={`/table/${params.name}/${params.id}?version=${cmp.toTag()}`}>▣ {to.displayName()} @ {cmp.toTag()}</A>
+                            </div>
+                        </div>
+                    }
                 >
                     <div class="flex flex-col lg:flex-row gap-4">
                         <Side label="From" tag={cmp.fromTag()} view={from}/>

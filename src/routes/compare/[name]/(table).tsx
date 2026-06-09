@@ -39,7 +39,7 @@ export default function TableCompareView() {
     const toRows = useRows(() => params.name, cmp.toStore);
 
     createEffect(() => {
-        nav.push({path: `/compare/${params.name}`, label: `⇄ ${params.name}`});
+        nav.push({path: `/compare/${params.name}?from=${cmp.fromTag()}&to=${cmp.toTag()}`, label: `⇄ ${params.name}`});
     });
 
     const metaFrom = () => cmp.fromStore.getTableMeta(params.name);
@@ -98,6 +98,11 @@ export default function TableCompareView() {
     const displayName = (id: string, store: DataStore): string =>
         store.getDisplayNames(params.name)?.get(id) ?? id;
 
+    // Reactive label getter — must be a function (not an eagerly-evaluated string)
+    // so that SolidJS can track the `displayNameVersion` signal read inside
+    // `getDisplayNames` and re-evaluate each For-item cell when names load async.
+    const makeLabel = (id: string, store: DataStore) => () => displayName(id, store);
+
     const compareHref = (id: string) =>
         `/compare/${params.name}/${encodeURIComponent(id)}?from=${cmp.fromTag()}&to=${cmp.toTag()}`;
 
@@ -114,7 +119,7 @@ export default function TableCompareView() {
 
     return (
         <div class="w-full mx-auto space-y-6">
-            <Title>⇄ {params.name} — cereal</Title>
+            <Title>{`⇄ ${params.name} — cereal`}</Title>
             <CompareHeader title={
                 <>
                     <A href={`/compare/?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>Compare</A>
@@ -222,7 +227,10 @@ export default function TableCompareView() {
                                 <For each={tableDiff()!.rows}>
                                     {(r) => {
                                         const store = r.kind === "removed" ? cmp.fromStore : cmp.toStore;
-                                        const label = displayName(r.id, store);
+                                        // `label` is a getter so that the `displayNameVersion` signal
+                                        // read inside `getDisplayNames` is tracked by the JSX expressions
+                                        // below — without this, async name resolution never re-renders.
+                                        const label = makeLabel(r.id, store);
                                         // Keyless tables use JSON-string ids that aren't routable.
                                         const linkable = (metaTo()?.primaryKey ?? metaFrom()?.primaryKey) != null;
                                         return (
@@ -231,15 +239,15 @@ export default function TableCompareView() {
                                                 fallback={
                                                     <div class="flex items-center gap-2 px-4 py-2 text-sm font-mono">
                                                         <span class={kindStyle[r.kind]}>{kindSign[r.kind]}</span>
-                                                        <span>{label}</span>
+                                                        <span>{label()}</span>
                                                     </div>
                                                 }
                                             >
                                                 <A href={compareHref(r.id)}
                                                    class="flex items-center gap-2 px-4 py-2 text-sm font-mono hover:bg-surface-2 transition-colors">
                                                     <span class={kindStyle[r.kind]}>{kindSign[r.kind]}</span>
-                                                    <span>{label}</span>
-                                                    <Show when={label !== r.id}>
+                                                    <span>{label()}</span>
+                                                    <Show when={label() !== r.id}>
                                                         <span class="text-text-muted text-xs">#{r.id}</span>
                                                     </Show>
                                                 </A>
