@@ -212,5 +212,9 @@
     "tag": "2026-05-28",
     "label": "1.36 - Friends of the Forest",
     "description": "Added Nubi placeables, Sagi pets, Wagon (III) quest.\n\nPremium: Everwoods outfits (rerun + new), pets, and furniture. First deployable appearances for Cervus mount.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-friends-of-the-forest\nBitCraft news 2: https://bitcraftonline.com/news/patch-notes-friends-of-the-forest\nSteam post: TBA"
+  },
+  {
+    "tag": "2026-06-04",
+    "description": "Temporary region preview data. Not pushed to main regions yet."
   }
 ]

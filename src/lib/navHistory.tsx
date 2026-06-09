@@ -29,6 +29,10 @@ export const NavHistoryProvider: ParentComponent = (props) => {
         if (entry.path.startsWith("/versions")) {
             tag = scope?.versions()?.[0]?.tag;
         }
+        // Compare pages carry their versions in from/to params, not the global version tag.
+        if (entry.path.startsWith("/compare")) {
+            tag = undefined;
+        }
         const enriched: NavEntry = {path: entry.path, label: entry.label, versionTag: tag};
 
         setHistory((prev) => {
@@ -48,6 +52,9 @@ export const NavHistoryProvider: ParentComponent = (props) => {
             const top = updated[updated.length - 1];
             if (top.path.startsWith("/versions") && (!path || path.startsWith("/versions"))) {
                 versionTag = top.versionTag; // discard version changes on version pages
+            }
+            if (top.path.startsWith("/compare") && (!path || path.startsWith("/compare"))) {
+                versionTag = top.versionTag; // compare pages don't track the global version tag
             }
             updated[updated.length - 1] = {
                 path: path ?? top.path,

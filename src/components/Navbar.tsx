@@ -288,7 +288,7 @@ export function Navbar() {
             value={versions.currentTag()}
             onKeyDown={(e) => handleSelectKey(e, e.currentTarget?.value)}
             onChange={(e) => selectVersion(e.currentTarget.value)}
-            class="px-2 py-1 rounded-md bg-surface-2 border border-border text-text text-sm w-full sm:w-auto focus:outline-hidden focus:ring-1 focus:ring-primary"
+            class="px-2 py-1 rounded-md bg-surface-2 border border-border text-text text-sm w-full sm:w-auto focus:outline-hidden focus:ring-1 focus:ring-primary field-sizing-content"
             aria-label="Data version"
         >
             <Show when={versions.versions()} fallback={<option value="latest">Loading…</option>}>

@@ -1,166 +1,24 @@
-import {createEffect, createResource, createSignal, For, Show, Suspense} from "solid-js";
-import {A, useParams, useSearchParams} from "@solidjs/router";
-import {isStaticTable, type ResolvedTableMeta, useData} from "~/lib/data";
-import {DataTable} from "~/components/DataTable";
 import {Title} from "@solidjs/meta";
+import {A, useParams, useSearchParams} from "@solidjs/router";
+import {createEffect, createResource, createSignal, For, Show, Suspense} from "solid-js";
+import {ColumnStructure} from "~/components/ColumnStructure";
+import {CompareButton} from "~/components/CompareButton";
+import {DataTable} from "~/components/DataTable";
+import {LoadingSpinner} from "~/components/LoadingSpinner";
+import {TableNotFound} from "~/components/NotFound";
+import {isStaticTable, type ResolvedTableMeta, useData} from "~/lib/data";
 import {useNavHistory} from "~/lib/navHistory";
 import type {ForeignKeyMapping} from "~/lib/schema";
-import {LoadingSpinner} from "~/components/LoadingSpinner";
-import {AlgebraicTypeView} from "~/components/AlgebraicTypeView";
-import {TableNotFound} from "~/components/NotFound";
 
-function ColumnStructure(props: { meta: ResolvedTableMeta; fks: ForeignKeyMapping[]; tableName: string }) {
+function CollapsibleSchema(props: {
+    meta: ResolvedTableMeta;
+    fks: ForeignKeyMapping[];
+    tableName: string;
+}) {
     const data = useData();
-
-    const fksByCol = () => {
-        const m = new Map<string, ForeignKeyMapping[]>();
-        for (const fk of props.fks) {
-            const col = fk.sourceField.split(".")[0];
-            if (!m.has(col)) m.set(col, []);
-            m.get(col)!.push(fk);
-        }
-        return m;
-    };
-
-    const schemaTable = () => {
-        const schema = data.getTypeContext()?.schema;
-        if (!schema) return undefined;
-        return schema.tables?.find((t) => t.name === props.tableName);
-    };
-
-    const columnIndex = (colName: string) => {
-        return props.meta.columns.indexOf(colName);
-    };
-
-    const hasUniqueConstraint = (colName: string) => {
-        const table = schemaTable();
-        if (!table?.constraints) return false;
-        const colIdx = columnIndex(colName);
-        return table.constraints.some((c) => c.data?.Unique?.columns?.includes(colIdx));
-    };
-
-    const getIndexInfo = (colName: string) => {
-        const table = schemaTable();
-        if (!table?.indexes) return undefined;
-        const colIdx = columnIndex(colName);
-        const matchingIndexes = table.indexes.filter((idx) => {
-            const cols = idx.algorithm?.BTree ?? idx.algorithm?.Hash ?? idx.algorithm?.Direct ?? [];
-            return Array.isArray(cols) ? cols.includes(colIdx) : cols === colIdx;
-        });
-        if (matchingIndexes.length === 0) return undefined;
-        
-        return matchingIndexes.map((idx) => {
-            const cols = idx.algorithm?.BTree ?? idx.algorithm?.Hash ?? idx.algorithm?.Direct ?? [];
-            if (typeof cols === 'number' || cols.length === 1) {
-                return { type: "single" as const, name: idx.accessor_name?.some ?? idx.name?.some };
-            } else if (cols.length > 1) {
-                const colNames = cols.map((i) => props.meta.columns[i]).filter(Boolean);
-                return { type: "multi" as const, name: idx.accessor_name?.some ?? idx.name?.some, columns: colNames };
-            }
-            // unknown index types should have been filtered by `matchingIndex` before so this *shouldn't* happen
-            return null;
-        }).filter((v: any): v is NonNullable<typeof v> => !!v);
-    };
-
-    return (
-        <div class="rounded-lg border border-border overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-surface-2">
-                <tr>
-                    <th class="px-4 py-2 text-left font-medium text-text-muted">Column</th>
-                    <th class="px-4 py-2 text-left font-medium text-text-muted">Type</th>
-                </tr>
-                </thead>
-                <tbody>
-                <For each={props.meta.columns}>
-                    {(col) => {
-                        const enumVariants = () => props.meta.enumValues?.[col];
-                        const colFks = () => fksByCol().get(col) ?? [];
-                        const colTypeRaw = () => data.getColumnType(props.tableName, col);
-                        const ctx = () => data.getTypeContext();
-                        const indexInfo = () => getIndexInfo(col);
-                        return (
-                            <tr class="border-t border-border align-top">
-                                <td class="px-4 py-2 font-mono text-text">
-                                    <div class="flex flex-wrap items-center gap-1">
-                                        <Show when={col === props.meta.primaryKey}>
-                                            <span
-                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
-                                                title="Primary Key - always unique and indexed">PK</span>
-                                        </Show>
-                                        <Show when={enumVariants()}>
-                                            <span
-                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted">enum</span>
-                                        </Show>
-                                        <Show when={colFks().length > 0}>
-                                            <span
-                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
-                                                title="Foreign key">FK</span>
-                                        </Show>
-                                        <Show when={col !== props.meta.primaryKey && hasUniqueConstraint(col)}>
-                                            <span
-                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
-                                                title="Unique constraint">UNIQUE</span>
-                                        </Show>
-                                        <Show when={col !== props.meta.primaryKey}>
-                                            <For each={indexInfo()}>
-                                                {(idx) => (
-                                                    <Show when={idx.type === "multi"}
-                                                        fallback={
-                                                            <span
-                                                                class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted"
-                                                                title={`Indexed on ${idx.name || "this column"}`}>IDX</span>
-                                                        }
-                                                    >
-                                                        <span
-                                                            class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-3 text-text-muted cursor-help"
-                                                            title={`Multi-column index ${idx.name}: ${(idx as any).columns?.join(", ")}`}>IDX*</span>
-                                                    </Show>
-                                                )}
-                                            </For>
-                                        </Show>
-                                        <span>{col}</span>
-                                    </div>
-                                    <Show when={colFks().length > 0}>
-                                        <div class="flex flex-wrap gap-1 mt-1">
-                                            <For each={colFks()}>
-                                                {(fk) => (
-                                                    <A
-                                                        href={`/table/${fk.targetTable}`}
-                                                        class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-2 border border-border hover:border-primary hover:text-primary transition-colors font-mono"
-                                                        title={`${fk.sourceField} → ${fk.targetTable}.${fk.targetField ?? "id"}`}
-                                                    >
-                                                        → {fk.targetTable}
-                                                    </A>
-                                                )}
-                                            </For>
-                                        </div>
-                                    </Show>
-                                </td>
-                                <td class="px-4 py-2 text-xs font-mono">
-                                    <Show
-                                        when={colTypeRaw() && ctx()}
-                                        fallback={
-                                            <Show when={enumVariants()}>
-                                                <span class="text-violet-400/70">{enumVariants()!.join(" | ")}</span>
-                                            </Show>
-                                        }
-                                    >
-                                        <AlgebraicTypeView type={colTypeRaw()!} ctx={ctx()!}/>
-                                    </Show>
-                                </td>
-                            </tr>
-                        );
-                    }}
-                </For>
-                </tbody>
-            </table>
-        </div>
-    );
-}
-
-function CollapsibleSchema(props: { meta: ResolvedTableMeta; fks: ForeignKeyMapping[]; tableName: string }) {
     const [open, setOpen] = createSignal(false);
+    const typeCtx = () => data.getTypeContext();
+    const schemaTable = () => typeCtx()?.schema.tables?.find((t) => t.name === props.tableName);
     return (
         <div class="rounded-lg border border-border overflow-hidden">
             <button
@@ -173,7 +31,14 @@ function CollapsibleSchema(props: { meta: ResolvedTableMeta; fks: ForeignKeyMapp
             </button>
             <Show when={open()}>
                 <div class="border-t border-border">
-                    <ColumnStructure meta={props.meta} fks={props.fks} tableName={props.tableName}/>
+                    <ColumnStructure
+                        meta={props.meta}
+                        fks={props.fks}
+                        tableName={props.tableName}
+                        schemaTable={schemaTable()}
+                        columnType={(col) => data.getColumnType(props.tableName, col)}
+                        typeCtx={typeCtx()}
+                    />
                 </div>
             </Show>
         </div>
@@ -229,7 +94,10 @@ export default function TableView() {
 
     const meta = () => data.getTableMeta(params.name);
     // Only attempt to load once the manifest is available (meta !== undefined) AND the table is static/public
-    const canLoad = () => { const m = meta(); return m != null && isStaticTable(params.name) && (m.isPublic ?? true); };
+    const canLoad = () => {
+        const m = meta();
+        return m != null && isStaticTable(params.name) && (m.isPublic ?? true);
+    };
 
     const [rows] = createResource(
         () => canLoad() ? {tag: data.tag(), name: params.name} : null,
@@ -244,6 +112,10 @@ export default function TableView() {
     const incomingRefs = () => data.getIncomingRefs(params.name);
     const hasRefs = () => outgoingRefs().length > 0 || incomingRefs().length > 0;
     const tableNotFound = () => !data.tableIndex.loading && data.getTableMeta(params.name) == null;
+
+    const typeCtx = () => data.getTypeContext();
+    const schemaTable = () => typeCtx()?.schema.tables?.find((t) => t.name === params.name);
+    const columnType = (col: string) => data.getColumnType(params.name, col);
 
     return (
         <div class="w-full min-w-[min(67vw,100%)] mx-auto space-y-6">
@@ -264,6 +136,10 @@ export default function TableView() {
                         >
                             ⬡ graph
                         </A>
+                        <CompareButton
+                            currentTag={data.tag()}
+                            buildHref={(other) => `/compare/${params.name}?from=${other}&to=${data.tag()}`}
+                        />
                     </div>
                     <Show when={meta()}>
                         {(m) => (
@@ -374,7 +250,8 @@ export default function TableView() {
                                     ? "This table contains runtime state. Cereal only comes in static flavors."
                                     : "This table is private and its contents are not accessible."}
                             </div>
-                            <ColumnStructure meta={m()} fks={outgoingRefs()} tableName={params.name}/>
+                            <ColumnStructure meta={m()} fks={outgoingRefs()} tableName={params.name}
+                                             schemaTable={schemaTable()} columnType={columnType} typeCtx={typeCtx()}/>
                         </div>
                     )}
                 </Show>
@@ -395,7 +272,8 @@ export default function TableView() {
                                             class="p-4 rounded-lg bg-surface-1 border border-border text-sm text-text-muted">
                                             This table is empty in the current version.
                                         </div>
-                                        <ColumnStructure meta={meta()!} fks={outgoingRefs()} tableName={params.name}/>
+                                        <ColumnStructure meta={meta()!} fks={outgoingRefs()} tableName={params.name}
+                                                         schemaTable={schemaTable()} columnType={columnType} typeCtx={typeCtx()}/>
                                     </div>
                                 }
                             >

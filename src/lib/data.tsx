@@ -1,16 +1,6 @@
-import {
-    Accessor,
-    createContext,
-    createEffect,
-    createMemo,
-    createResource,
-    createSignal,
-    ParentComponent,
-    Resource,
-    untrack,
-    useContext,
-} from "solid-js";
 import {useLocation, useSearchParams} from "@solidjs/router";
+import {Accessor, createContext, createEffect, createMemo, createResource, createSignal, ParentComponent, Resource, untrack, useContext,} from "solid-js";
+import {DATA_CDN_BASE} from "./constants";
 import {
     type AlgebraicType,
     buildTypeIndexMap,
@@ -22,7 +12,6 @@ import {
     type TableMeta,
     type VersionEntry,
 } from "./schema";
-import {DATA_CDN_BASE} from "./constants";
 
 export type ResolvedTableMeta = Omit<TableMeta, "enumValues"> & {
     enumValues: Record<string, string[]>;
@@ -45,6 +34,7 @@ export interface DataStore {
     getColumnType: (tableName: string, columnName: string) => AlgebraicType | undefined;
     getTypeContext: () => { schema: SpacetimeDBSchema; idxMap: Map<number, string> } | undefined;
     getDisplayNames: (tableName: string) => Map<string, string> | undefined;
+    manifest: Resource<DefManifest | null>;
     schema: Resource<SpacetimeDBSchema | null>;
     searchIndex: Resource<SearchIndex | null>;
     tag: Accessor<string>;
@@ -57,7 +47,13 @@ export function isStaticTable(name: string): boolean {
 interface VersionCaches {
     manifests: Map<string, DefManifest | null>;
     schemas: Map<string, SpacetimeDBSchema | null>;
-    idxMaps: Map<string, Map<number, string> | null>;
+    /**
+     * Type-index maps keyed by the *schema object identity* (not by tag). Keying by tag is
+     * unsafe: while a new version's schema is still loading, `schema()` transiently returns
+     * the previous version's schema, so a tag-keyed cache could permanently store an idxMap
+     * built from the wrong schema (causing Ref indices to resolve to the wrong type names).
+     */
+    idxMaps: WeakMap<SpacetimeDBSchema, Map<number, string>>;
     /** tag → tableName → rows */
     tables: Map<string, Map<string, Record<string, unknown>[]>>;
     /** tag → tableName → pk → label */
@@ -109,7 +105,7 @@ export const DataProvider: ParentComponent = (props) => {
     const caches: VersionCaches = {
         manifests: new Map(),
         schemas: new Map(),
-        idxMaps: new Map(),
+        idxMaps: new WeakMap(),
         tables: new Map(),
         displayNames: new Map(),
         displayNameVersion,
@@ -169,7 +165,10 @@ export const DataProvider: ParentComponent = (props) => {
             return promise;
         });
 
-        const settled = () => { const m = manifest(); return m !== undefined ? {m} : undefined; };
+        const settled = () => {
+            const m = manifest();
+            return m !== undefined ? {m} : undefined;
+        };
 
         const [searchIndex] = createResource(tagSignal, async (ver): Promise<SearchIndex | null> => {
             if (!ver || ver === "__pending__") return null;
@@ -210,12 +209,15 @@ export const DataProvider: ParentComponent = (props) => {
         const [foreignKeys] = createResource(settled, ({m}): ForeignKeyMapping[] => m?.foreignKeys ?? []);
 
         function getIdxMap(): Map<number, string> | null {
-            const ver = tagSignal();
-            if (caches.idxMaps.has(ver)) return caches.idxMaps.get(ver)!;
             const s = schema();
             if (!s) return null;
-            const map = buildTypeIndexMap(s);
-            caches.idxMaps.set(ver, map);
+            // Cache by schema identity so the idxMap always matches the schema it pairs with,
+            // even if the resource transiently returns a stale schema during version switches.
+            let map = caches.idxMaps.get(s);
+            if (!map) {
+                map = buildTypeIndexMap(s);
+                caches.idxMaps.set(s, map);
+            }
             return map;
         }
 
@@ -252,7 +254,9 @@ export const DataProvider: ParentComponent = (props) => {
             const map = new Map<string, ForeignKeyMapping[]>();
             const add = (target: string, fk: ForeignKeyMapping) => {
                 const list = map.get(target);
-                if (list) { if (!list.includes(fk)) list.push(fk); } else map.set(target, [fk]);
+                if (list) {
+                    if (!list.includes(fk)) list.push(fk);
+                } else map.set(target, [fk]);
             };
             for (const fk of foreignKeys() ?? []) {
                 add(fk.targetTable, fk);
@@ -267,7 +271,10 @@ export const DataProvider: ParentComponent = (props) => {
         async function fetchTable(name: string): Promise<Record<string, unknown>[]> {
             const ver = tagSignal();
             let vCache = caches.tables.get(ver);
-            if (!vCache) { vCache = new Map(); caches.tables.set(ver, vCache); }
+            if (!vCache) {
+                vCache = new Map();
+                caches.tables.set(ver, vCache);
+            }
             if (vCache.has(name)) return vCache.get(name)!;
 
             let res: Response;
@@ -289,7 +296,10 @@ export const DataProvider: ParentComponent = (props) => {
             const meta = getTableMeta(name);
             if (meta?.primaryKey && meta.displayField) {
                 let dnVersionMap = caches.displayNames.get(ver);
-                if (!dnVersionMap) { dnVersionMap = new Map(); caches.displayNames.set(ver, dnVersionMap); }
+                if (!dnVersionMap) {
+                    dnVersionMap = new Map();
+                    caches.displayNames.set(ver, dnVersionMap);
+                }
                 const map = new Map<string, string>();
                 for (const row of rows) {
                     const pk = String(row[meta.primaryKey]);
@@ -303,6 +313,25 @@ export const DataProvider: ParentComponent = (props) => {
                     resolveCraftingRecipeNames(ver, rows, meta.primaryKey, map)
                         .then(() => caches.bumpDisplayNameVersion())
                         .catch(() => {/* non-fatal */});
+                }
+            }
+
+            const syntheticDisplayNameTables = new Set(["extraction_recipe_desc"]);
+            // Tables that need synthetic display names but have no displayField get their own
+            // resolver block. The map is created here so resolvers can populate it freely.
+            if (meta?.primaryKey && syntheticDisplayNameTables.has(name)) {
+                let dnVersionMap = caches.displayNames.get(ver);
+                if (!dnVersionMap) {
+                    dnVersionMap = new Map();
+                    caches.displayNames.set(ver, dnVersionMap);
+                }
+                const map = dnVersionMap.get(name) ?? new Map<string, string>();
+                dnVersionMap.set(name, map);
+                if (name === "extraction_recipe_desc") {
+                    resolveExtractionRecipeNames(ver, rows, meta.primaryKey, map)
+                        .then(() => caches.bumpDisplayNameVersion())
+                        .catch(() => {/* non-fatal */
+                        });
                 }
             }
             return rows;
@@ -337,6 +366,22 @@ export const DataProvider: ParentComponent = (props) => {
             }
         }
 
+        async function resolveExtractionRecipeNames(
+            ver: string,
+            rows: Record<string, unknown>[],
+            primaryKey: string,
+            map: Map<string, string>,
+        ) {
+            await fetchTable("resource_desc").catch(() => []);
+            const resourceById = caches.displayNames.get(ver)?.get("resource_desc") ?? new Map<string, string>();
+            for (const row of rows) {
+                const resourceId = String(row["resource_id"] ?? "");
+                const resourceName = resourceById.get(resourceId);
+                const verbPhrase = row["verb_phrase"] ?? "Extract";
+                if (resourceName) map.set(String(row[primaryKey]), `${verbPhrase} ${resourceName}`);
+            }
+        }
+
         return {
             tableIndex,
             fetchTable,
@@ -359,6 +404,7 @@ export const DataProvider: ParentComponent = (props) => {
                 caches.displayNameVersion(); // reactive dep
                 return caches.displayNames.get(tagSignal())?.get(name);
             },
+            manifest,
             schema,
             searchIndex,
             tag: tagSignal,
@@ -404,7 +450,7 @@ export const VersionScopeProvider: ParentComponent<VersionScopeProviderProps> = 
             if (urlTag && vList.some((v) => v.tag === urlTag)) {
                 setTag(urlTag);
             } else {
-                if (urlTag) setSearchParams({ version: undefined }, { replace: true });
+                if (urlTag) setSearchParams({version: undefined}, {replace: true});
                 setTag(latest);
             }
             return;
@@ -418,7 +464,7 @@ export const VersionScopeProvider: ParentComponent<VersionScopeProviderProps> = 
             if (vList.some((v) => v.tag === urlTag)) {
                 setTag(urlTag);
             } else {
-                setSearchParams({ version: undefined }, { replace: true });
+                setSearchParams({version: undefined}, {replace: true});
             }
         }
     });
@@ -441,9 +487,9 @@ export const VersionScopeProvider: ParentComponent<VersionScopeProviderProps> = 
         const urlTag = urlParams.get("version") || undefined;
 
         if (currentTag === latest) {
-            if (urlTag) setSearchParams({ version: undefined }, { replace: true });
+            if (urlTag) setSearchParams({version: undefined}, {replace: true});
         } else {
-            if (urlTag !== currentTag) setSearchParams({ version: currentTag }, { replace: true });
+            if (urlTag !== currentTag) setSearchParams({version: currentTag}, {replace: true});
         }
     });
 
@@ -470,4 +516,94 @@ export function useVersions() {
         currentTag: ctx.tag,
         setCurrentTag: ctx.setTag,
     };
+}
+
+interface CompareScope {
+    fromStore: DataStore;
+    toStore: DataStore;
+    fromTag: Accessor<string>;
+    toTag: Accessor<string>;
+    setFrom: (tag: string) => void;
+    setTo: (tag: string) => void;
+    versions: Resource<VersionEntry[]>;
+}
+
+const CompareScopeContext = createContext<CompareScope>();
+
+/**
+ * Provides two independent versioned data stores (`from` = older, `to` = newer) so a single
+ * component can compute diffs against both versions. Reads/writes `from`/`to` search params,
+ * normalizes order (older first), and defaults `to` to the latest version.
+ */
+export const CompareScopeProvider: ParentComponent = (props) => {
+    const registry = useContext(DataRegistryContext);
+    if (!registry) throw new Error("CompareScopeProvider must be inside DataProvider");
+
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    /** Index of a tag in the versions list (lower index = newer). -1 if unknown. */
+    const indexOf = (tag: string | undefined): number => {
+        const list = registry.versions();
+        if (!list || !tag) return -1;
+        return list.findIndex((v) => v.tag === tag);
+    };
+
+    // Resolved, normalized tags. `from` is always the older (higher index) of the two.
+    const rawFrom = (): string | undefined => {
+        const v = searchParams.from;
+        return (Array.isArray(v) ? v[0] : v) || undefined;
+    };
+    const rawTo = (): string | undefined => {
+        const v = searchParams.to;
+        return (Array.isArray(v) ? v[0] : v) || undefined;
+    };
+
+    const fromTag: Accessor<string> = () => {
+        const list = registry.versions();
+        if (!list?.length) return "__pending__";
+        const latest = list[0].tag;
+        const f = rawFrom();
+        const t = rawTo() ?? latest;
+        const fi = indexOf(f);
+        const ti = indexOf(t);
+        // Default `from` to the version just before `to` when not specified.
+        if (fi === -1) {
+            const tIdx = ti === -1 ? 0 : ti;
+            return list[Math.min(tIdx + 1, list.length - 1)].tag;
+        }
+        // Older = higher index.
+        return fi >= ti ? f! : t;
+    };
+
+    const toTag: Accessor<string> = () => {
+        const list = registry.versions();
+        if (!list?.length) return "__pending__";
+        const latest = list[0].tag;
+        const f = rawFrom();
+        const t = rawTo() ?? latest;
+        const fi = indexOf(f);
+        const ti = indexOf(t);
+        if (fi === -1) return t;
+        return fi >= ti ? t : f!;
+    };
+
+    const setFrom = (tag: string) => setSearchParams({from: tag, to: rawTo() ?? toTag()});
+    const setTo = (tag: string) => setSearchParams({from: rawFrom() ?? fromTag(), to: tag});
+
+    const fromStore = registry.createVersionedStore(fromTag);
+    const toStore = registry.createVersionedStore(toTag);
+
+    return (
+        <CompareScopeContext.Provider
+            value={{fromStore, toStore, fromTag, toTag, setFrom, setTo, versions: registry.versions}}
+        >
+            {props.children}
+        </CompareScopeContext.Provider>
+    );
+};
+
+export function useCompare(): CompareScope {
+    const ctx = useContext(CompareScopeContext);
+    if (!ctx) throw new Error("useCompare must be used within CompareScopeProvider");
+    return ctx;
 }
