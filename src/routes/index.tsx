@@ -96,6 +96,13 @@ export default function Home() {
                     >
                         ⬡ graph
                     </A>
+                    <A
+                        href={`/compare`}
+                        class="text-xs px-2 py-1 rounded-sm bg-surface-1 border border-border hover:border-primary hover:text-primary transition-colors"
+                        title="View version changes"
+                    >
+                        ⇄ compare
+                    </A>
                     <div class="flex items-center gap-3 sm:ml-auto flex-wrap">
                         <Toggle label="📋 Static" checked={showStatic()} onChange={() => setShowStatic((v) => !v)}
                                 title="Show normal static (desc) tables"/>
@@ -121,7 +128,7 @@ export default function Home() {
                                     class="block p-4 rounded-lg bg-surface-1 border border-border hover:border-primary hover:shadow-md transition-all group"
                                 >
                                     <div
-                                        class="font-medium font-mono text-text group-hover:text-primary transition-colors">
+                                        class="font-medium font-mono text-text group-hover:text-primary transition-colors truncate">
                                         {table.name}
                                     </div>
                                     <div class="flex items-center gap-3 mt-2 text-xs text-text-muted">

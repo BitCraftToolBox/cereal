@@ -1,7 +1,8 @@
-import {createEffect, createMemo, createSignal, For, JSX, Show} from "solid-js";
 import {A} from "@solidjs/router";
-import {type ForeignKeyMapping, resolveTargetTable} from "~/lib/schema";
+import {createEffect, createMemo, createSignal, For, JSX, Show} from "solid-js";
 import {SpriteLink} from "~/components/SpriteImage";
+import type {DiffKind} from "~/lib/diff";
+import {type ForeignKeyMapping, resolveTargetTable} from "~/lib/schema";
 
 interface JsonViewerProps {
     data: unknown;
@@ -16,6 +17,8 @@ interface JsonViewerProps {
     enumValues?: Record<string, string[]>;
     enumVariantsByName?: Map<string, string[]>;
     spriteFields?: Set<string>;
+    highlights?: Map<string, DiffKind>;
+    versionTag?: string;
 }
 
 export function JsonViewer(props: JsonViewerProps) {
@@ -57,11 +60,13 @@ export function JsonViewer(props: JsonViewerProps) {
                     enumValues={props.enumValues}
                     enumVariantsByName={props.enumVariantsByName}
                     spriteFields={props.spriteFields}
+                    highlights={props.highlights}
                     fieldPath=""
                     contextObj={typeof props.data === "object" && props.data !== null && !Array.isArray(props.data)
                         ? props.data as Record<string, unknown>
                         : undefined}
                     forceExpanded={forceExpanded()}
+                    versionTag={props.versionTag}
                 />
             </pre>
         </div>
@@ -86,12 +91,35 @@ interface JsonNodeProps {
     contextObj?: Record<string, unknown>;
     forceExpanded?: { value: boolean } | null;
     spriteFields?: Set<string>;
+    highlights?: Map<string, DiffKind>;
+    versionTag?: string;
+}
+
+/** Build a table-object link, carrying an optional version tag as a query param. */
+function tableHref(table: string, id: string, versionTag?: string): string {
+    const base = `/table/${table}/${encodeURIComponent(id)}`;
+    return versionTag ? `${base}?version=${encodeURIComponent(versionTag)}` : base;
+}
+
+/** Background tint class for a diff-highlighted field. */
+function highlightClass(kind: DiffKind | undefined): string {
+    switch (kind) {
+        case "added":
+            return "bg-green-500/15 rounded-sm";
+        case "removed":
+            return "bg-red-500/15 rounded-sm";
+        case "changed":
+            return "bg-yellow-500/15 rounded-sm";
+        default:
+            return "";
+    }
 }
 
 function JsonNode(props: JsonNodeProps) {
     const isExpandable = () =>
         props.value !== null && typeof props.value === "object";
     const [expanded, setExpanded] = createSignal(props.depth < props.maxExpandDepth);
+    const highlight = () => props.highlights?.get(props.fieldPath);
 
     createEffect(() => {
         const f = props.forceExpanded;
@@ -163,9 +191,9 @@ function JsonNode(props: JsonNodeProps) {
                 <span class="text-text-muted">{"// "}</span>
                 <Show when={target}>
                     <A
-                      href={`/table/${target}/${encodeURIComponent(resolvedId())}`}
-                      class="text-text-muted hover:text-primary transition-colors"
-                      title={`Go to ${target} #${resolvedId()}`}
+                        href={tableHref(target!, resolvedId(), props.versionTag)}
+                        class="text-text-muted hover:text-primary transition-colors"
+                        title={`Go to ${target} #${resolvedId()}`}
                     >
                         <Show when={fkLabel()} fallback={<span>→{target}</span>}>
                             <span class="italic">{target} &quot;{fkLabel()}&quot;</span>
@@ -183,12 +211,12 @@ function JsonNode(props: JsonNodeProps) {
         <Show
             when={isExpandable()}
             fallback={
-                <>
+                <span class={highlightClass(highlight())}>
                     <Show
                         when={props.spriteFields?.has(props.fieldPath) && typeof props.value === "string" && props.value.length > 1}
                         fallback={fkTarget() ?
                             <A
-                                href={`/table/${fkTarget()}/${encodeURIComponent(resolvedId())}`}
+                                href={tableHref(fkTarget()!, resolvedId(), props.versionTag)}
                                 title={`Go to ${fkTarget()} #${resolvedId()}`}
                             >
                                 <JsonPrimitive value={props.value}/>
@@ -202,10 +230,10 @@ function JsonNode(props: JsonNodeProps) {
                     </Show>
                     <Show when={props.trailing}><span class="text-text-muted">,</span></Show>
                     {fkAnnotation()}
-                </>
+                </span>
             }
         >
-            {(() => {
+            {(_) => {
                 const isArray = Array.isArray(props.value);
                 const entries = isArray
                     ? (props.value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
@@ -228,6 +256,12 @@ function JsonNode(props: JsonNodeProps) {
                             {expanded() ? "▼" : "▶"}{" "}
                         </button>
                         <span class="text-text-muted">{openBrace}</span>
+                        <Show when={highlight()}>
+                            <span class={`ml-1 px-1 text-xs ${highlightClass(highlight())}`}
+                                  title={`Field ${highlight()}`}>
+                                {highlight() === "added" ? "+" : highlight() === "removed" ? "−" : "~"}
+                            </span>
+                        </Show>
                         <Show
                             when={expanded()}
                             fallback={<span class="text-text-muted"> ...{entries.length} items {closeBrace}</span>}
@@ -237,11 +271,12 @@ function JsonNode(props: JsonNodeProps) {
                                     const childPath = props.fieldPath
                                         ? (isArray ? props.fieldPath : `${props.fieldPath}.${key}`)
                                         : key;
+                                    const childHighlight = props.highlights?.get(childPath);
                                     return (
                                         <div>
                                             <span>{childIndent()}</span>
                                             <Show when={!isArray}>
-                                                <span class="text-primary">&quot;{key}&quot;</span>
+                                                <span class={`text-primary ${highlightClass(childHighlight)}`}>&quot;{key}&quot;</span>
                                                 <span class="text-text-muted">: </span>
                                             </Show>
                                             <JsonNode
@@ -257,6 +292,8 @@ function JsonNode(props: JsonNodeProps) {
                                                 spriteFields={props.spriteFields}
                                                 contextObj={childContextObj}
                                                 forceExpanded={props.forceExpanded}
+                                                highlights={props.highlights}
+                                                versionTag={props.versionTag}
                                             />
                                         </div>
                                     );
@@ -270,7 +307,7 @@ function JsonNode(props: JsonNodeProps) {
                         </Show>
                     </>
                 );
-            })()}
+            }}
         </Show>
     );
 }

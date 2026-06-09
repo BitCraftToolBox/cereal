@@ -90,7 +90,7 @@ export default function TableGraph() {
 
     return (
         <div class="flex flex-col flex-1 min-h-0 gap-3">
-            <Title>{params.name} graph — cereal</Title>
+            <Title>{`${params.name} graph — cereal`}</Title>
 
             <Show when={tableNotFound()}>
                 <TableNotFound name={params.name}/>

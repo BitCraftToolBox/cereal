@@ -31,17 +31,16 @@ const NODE_W = 110;
 const NODE_H = 36;
 const CORNER_R = 5;
 
-const PUBLIC_COLOR = "hsl(220 65% 60% / 1)";
+const PUBLIC_COLOR = "hsl(220 65% 60%)";
 const PUBLIC_BORDER = "hsl(220 65% 45% / 0.8)";
-const HIDDEN_COLOR = "hsl(260 40% 55% / 1)";
+const HIDDEN_COLOR = "hsl(260 40% 55%)";
 const HIDDEN_BORDER = "hsl(260 40% 40% / 0.8)";
-const EDGE_COLOR = "hsl(var(--color-border) / 0.5)";
+const EDGE_COLOR = "color-mix(in srgb, var(--color-border) 50%, transparent)";
 const EDGE_HOV = "hsl(220 65% 60% / 0.9)";
 
 function nodeColor(n: NetworkNode, hov: boolean) {
     const base = n.isPublic ? PUBLIC_COLOR : HIDDEN_COLOR;
-    // bump opacity when hovered
-    return hov ? base.replace("/ 1)", "/ 0.95)") : base.replace("/ 1)", "/ 0.75)");
+    return `color-mix(in srgb, ${base} ${hov ? 95 : 75}%, transparent)`;
 }
 
 function nodeBorder(n: NetworkNode) {
@@ -263,7 +262,7 @@ export function NetworkGraph(props: NetworkGraphProps) {
                                         <text
                                             text-anchor="middle"
                                             font-size="10"
-                                            fill="hsl(var(--color-text) / 1)"
+                                            fill="var(--color-text)"
                                             style="pointer-events:none;font-family:monospace"
                                         >
                                             <For each={lines}>
@@ -301,12 +300,12 @@ export function NetworkGraph(props: NetworkGraphProps) {
                                         <rect
                                             x={mid()!.x - bw / 2} y={mid()!.y - 10}
                                             width={bw} height={18} rx={3}
-                                            fill="hsl(var(--color-surface-1) / 0.97)"
-                                            stroke="hsl(var(--color-border) / 0.7)" stroke-width={0.5}
+                                            fill="color-mix(in srgb, var(--color-surface-1) 97%, transparent)"
+                                            stroke="color-mix(in srgb, var(--color-border) 70%, transparent)" stroke-width={0.5}
                                         />
                                         <text x={mid()!.x} y={mid()!.y} text-anchor="middle"
                                               dominant-baseline="middle" font-size="10"
-                                              fill="hsl(var(--color-text-muted) / 1)"
+                                              fill="var(--color-text-muted)"
                                               style="font-family:monospace">
                                             {label}
                                         </text>

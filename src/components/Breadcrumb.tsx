@@ -1,7 +1,7 @@
 import {A, useLocation} from "@solidjs/router";
 import {createEffect, createMemo, createSignal, For, Show} from "solid-js";
-import {useNavHistory} from "~/lib/navHistory";
 import {useVersions} from "~/lib/data";
+import {useNavHistory} from "~/lib/navHistory";
 
 const COLLAPSE_THRESHOLD = 5;
 
@@ -13,6 +13,9 @@ function pathToTitle(path: string): string | undefined {
     if (parts[0] === "graph" && parts.length === 2) return parts[1];
     if (parts[0] === "graph" && parts.length >= 3) return `${parts[1]} / ${decodeURIComponent(parts[2])}`;
     if (parts[0] === "versions" && parts.length >= 2) return `versions / ${decodeURIComponent(parts[1])}`;
+    if (parts[0] === "compare" && parts.length === 1) return "compare";
+    if (parts[0] === "compare" && parts.length === 2) return `compare / ${parts[1]}`;
+    if (parts[0] === "compare" && parts.length >= 3) return `compare / ${parts[1]} / ${decodeURIComponent(parts[2])}`;
     return undefined;
 }
 

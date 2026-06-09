@@ -1,21 +1,15 @@
-import {createEffect, createMemo, Show} from "solid-js";
-import {A, useNavigate, useParams} from "@solidjs/router";
-import {isStaticTable, useData} from "~/lib/data";
-import {JsonViewer} from "~/components/JsonViewer";
 import {Title} from "@solidjs/meta";
-import {type ForeignKeyMapping} from "~/lib/schema";
-import {useNavHistory} from "~/lib/navHistory";
+import {A, useNavigate, useParams} from "@solidjs/router";
+import {createEffect, createMemo, Show} from "solid-js";
+import {CompareButton} from "~/components/CompareButton";
+import {JsonViewer} from "~/components/JsonViewer";
 import {LoadingSpinner} from "~/components/LoadingSpinner";
 import {ObjectNotFound, TableNotFound} from "~/components/NotFound";
 import {RefPills} from "~/components/RefPills";
-import {
-    buildFkMap,
-    createDisplayNameMap,
-    createIncomingResults,
-    createObjectRow,
-    createOutgoingResults,
-    outgoingDisplayTables,
-} from "~/lib/objectRefs";
+import {isStaticTable, useData} from "~/lib/data";
+import {useNavHistory} from "~/lib/navHistory";
+import {buildFkMap, createDisplayNameMap, createIncomingResults, createObjectRow, createOutgoingResults, outgoingDisplayTables,} from "~/lib/objectRefs";
+import {type ForeignKeyMapping} from "~/lib/schema";
 
 export default function ObjectView() {
     const params = useParams<{ name: string; id: string }>();
@@ -76,7 +70,7 @@ export default function ObjectView() {
 
     return (
         <div class="w-full min-w-[min(67vw,100%)] mx-auto space-y-6">
-            <Title>{displayName()} — {params.name} — cereal</Title>
+            <Title>{`${displayName()} — ${params.name} — cereal`}</Title>
 
             <Show when={tableNotFound()}>
                 <TableNotFound name={params.name}/>
@@ -107,6 +101,10 @@ export default function ObjectView() {
                         >
                             ⬡ graph
                         </A>
+                        <CompareButton
+                            currentTag={data.tag()}
+                            buildHref={(other) => `/compare/${params.name}/${params.id}?from=${other}&to=${data.tag()}`}
+                        />
                     </div>
                     <p class="text-sm text-text-muted font-mono">
                         <A href={`/table/${params.name}`}
