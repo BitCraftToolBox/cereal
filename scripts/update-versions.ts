@@ -46,6 +46,23 @@ for (let i = 0; i < args.length; i++) {
 
 const DATA_DIR = path.join(dataRoot, "data");
 const VERSIONS_FILE = path.join(dataRoot, "versions.json");
+const LATEST_FILE = path.join(dataRoot, "latest.json");
+
+function parseVersionTag(tag: string): {base: string; patch: number} {
+    const match = tag.match(/^(\d{4}-\d{2}-\d{2})(?:-(\d+))?$/);
+    if (!match) return {base: tag, patch: 0};
+    return {
+        base: match[1],
+        patch: parseInt(match[2] ?? "0", 10),
+    };
+}
+
+function compareVersionTagsDesc(a: string, b: string): number {
+    const pa = parseVersionTag(a);
+    const pb = parseVersionTag(b);
+    if (pa.base !== pb.base) return pb.base.localeCompare(pa.base);
+    return pb.patch - pa.patch;
+}
 
 
 // ---------------------------------------------------------------------------
@@ -244,7 +261,16 @@ for (const tag of folders) {
 // ---------------------------------------------------------------------------
 // 4. Write updated versions.json (sorted newest first)
 // ---------------------------------------------------------------------------
-const sortedManifest = [...manifestByTag.values()].sort((a, b) => b.tag.localeCompare(a.tag));
+const sortedManifest = [...manifestByTag.values()].sort((a, b) => compareVersionTagsDesc(a.tag, b.tag));
 fs.writeFileSync(VERSIONS_FILE, JSON.stringify(sortedManifest, null, 2), "utf-8");
 console.log(`\nWrote ${VERSIONS_FILE} with ${sortedManifest.length} entries`);
+
+const latest = sortedManifest[0];
+const latestData = {
+    tag: latest?.tag ?? null,
+    label: latest?.label ?? null,
+    description: latest?.description ?? null,
+};
+fs.writeFileSync(LATEST_FILE, JSON.stringify(latestData, null, 2), "utf-8");
+console.log(`Wrote ${LATEST_FILE}`);
 console.log("\nDone.");
