@@ -211,10 +211,15 @@
   {
     "tag": "2026-05-28",
     "label": "1.36 - Friends of the Forest",
-    "description": "Added Nubi placeables, Sagi pets, Wagon (III) quest.\n\nPremium: Everwoods outfits (rerun + new), pets, and furniture. First deployable appearances for Cervus mount.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-friends-of-the-forest\nBitCraft news 2: https://bitcraftonline.com/news/patch-notes-friends-of-the-forest\nSteam post: TBA"
+    "description": "Added Nubi placeables, Sagi pets, Wagon (III) quest.\n\nPremium: Everwoods outfits (rerun + new), pets, and furniture. First deployable appearances for Cervus mount.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-friends-of-the-forest\nBitCraft news 2: https://bitcraftonline.com/news/patch-notes-friends-of-the-forest\nSteam post: https://store.steampowered.com/news/app/3454650/view/712276809750676054"
   },
   {
     "tag": "2026-06-04",
     "description": "Temporary region preview data. Not pushed to main regions yet."
+  },
+  {
+    "tag": "2026-06-11",
+    "label": "1.37 - Uncharted Islands",
+    "description": "New temporary regions and world events.\n\nPremium: Swashbuckler outfits, pets, Wharf furniture, Pirate and Navy boat appearances.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-uncharted-lands\nSteam post: https://store.steampowered.com/news/app/3454650/view/517497484410356212"
   }
 ]
