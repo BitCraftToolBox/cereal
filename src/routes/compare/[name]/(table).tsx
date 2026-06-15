@@ -17,7 +17,7 @@ function useRows(tableName: () => string, store: DataStore) {
     };
     const [rows] = createResource(
         () => canLoad() ? {tag: store.tag(), name: tableName()} : null,
-        (s) => store.fetchTable(s.name).catch(() => []),
+        (s) => store.fetchTableFor(s.tag, s.name).catch(() => []),
     );
     return {rows, canLoad};
 }

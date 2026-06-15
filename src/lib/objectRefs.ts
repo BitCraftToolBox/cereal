@@ -76,7 +76,7 @@ export function createObjectRow(
 
     const [rows] = createResource(
         () => isFetchable() ? {tag: data.tag(), name: tableName()} : null,
-        (s) => data.fetchTable(s.name),
+        (s) => data.fetchTableFor(s.tag, s.name),
     );
 
     const row = createMemo(() => {
@@ -250,12 +250,11 @@ export function createIncomingResults(
     const [tableData] = createResource(
         () => {
             const t = fetchableTables().join(",");
-            return t ? `${data.tag()}:${t}` : null;
+            return t ? {tag: data.tag(), tables: fetchableTables()} : null;
         },
-        async () => {
-            const tables = fetchableTables();
+        async (s) => {
             const pairs = await Promise.all(
-                tables.map((t) => data.fetchTable(t).then((rows) => [t, rows] as const)),
+                s.tables.map((t) => data.fetchTableFor(s.tag, t).then((rows) => [t, rows] as const)),
             );
             return new Map(pairs);
         },
@@ -325,7 +324,8 @@ export function createDisplayNameMap(
     data: DataStore,
 ): { displayNames: Accessor<DisplayNameMap> } {
     createEffect(() => {
-        for (const t of tableList()) data.fetchTable(t).catch(() => {});
+        const ver = data.tag();
+        for (const t of tableList()) data.fetchTableFor(ver, t).catch(() => {});
     });
 
     const displayNames = createMemo((): DisplayNameMap => {

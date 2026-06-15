@@ -24,7 +24,13 @@ export interface TableIndex {
 
 export interface DataStore {
     tableIndex: Resource<TableIndex[]>;
-    fetchTable: (name: string) => Promise<Record<string, unknown>[]>;
+    /**
+     * Version-explicit row fetch. Prefer this from `createResource` fetchers whose source key
+     * already captured a version (`s.tag`): it guarantees rows + display names are cached under
+     * the *intended* version, instead of whatever `tagSignal()` transiently is when the (async)
+     * fetcher runs. Same rationale as the schema-identity `idxMaps` keying below.
+     */
+    fetchTableFor: (ver: string, name: string) => Promise<Record<string, unknown>[]>;
     getTable: (name: string) => Record<string, unknown>[] | undefined;
     getTableMeta: (name: string) => ResolvedTableMeta | undefined;
     foreignKeys: Resource<ForeignKeyMapping[]>;
@@ -324,6 +330,7 @@ export const DataProvider: ParentComponent = (props) => {
                     if (label) map.set(pk, String(label));
                 }
                 dnVersionMap.set(name, map);
+                caches.bumpDisplayNameVersion();
 
                 if (name === "crafting_recipe_desc") {
                     resolveCraftingRecipeNames(ver, rows, meta.primaryKey, map)
@@ -338,6 +345,7 @@ export const DataProvider: ParentComponent = (props) => {
             if (syntheticDisplayNameTables.has(name)) {
                 const map = new Map<string, string>();
                 dnVersionMap.set(name, map);
+                caches.bumpDisplayNameVersion();
                 if (name === "extraction_recipe_desc") {
                     resolveExtractionRecipeNames(ver, rows, meta.primaryKey, map)
                         .then(() => caches.bumpDisplayNameVersion())
@@ -434,7 +442,7 @@ export const DataProvider: ParentComponent = (props) => {
 
         return {
             tableIndex,
-            fetchTable,
+            fetchTableFor,
             getTable: (name) => caches.tables.get(tagSignal())?.get(name),
             getTableMeta,
             foreignKeys,

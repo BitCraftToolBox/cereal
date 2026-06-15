@@ -101,7 +101,7 @@ export default function TableView() {
 
     const [rows] = createResource(
         () => canLoad() ? {tag: data.tag(), name: params.name} : null,
-        (s) => data.fetchTable(s.name)
+        (s) => data.fetchTableFor(s.tag, s.name)
     );
 
     createEffect(() => {

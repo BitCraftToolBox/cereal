@@ -48,7 +48,7 @@ export default function VersionCompareView() {
     const [rowDeltas] = createResource(
         () => loadRows() && fromManifest() && toManifest()
             ? {from: cmp.fromTag(), to: cmp.toTag()} : null,
-        async (): Promise<RowDeltaMap> => {
+        async (s): Promise<RowDeltaMap> => {
             const a = fromManifest()!;
             const b = toManifest()!;
             const metaA = new Map(a.tables.map((t) => [t.name, t]));
@@ -57,8 +57,8 @@ export default function VersionCompareView() {
             const map: RowDeltaMap = new Map();
             await Promise.all(names.map(async (name) => {
                 const [ra, rb] = await Promise.all([
-                    cmp.fromStore.fetchTable(name).catch(() => []),
-                    cmp.toStore.fetchTable(name).catch(() => []),
+                    cmp.fromStore.fetchTableFor(s.from, name).catch(() => []),
+                    cmp.toStore.fetchTableFor(s.to, name).catch(() => []),
                 ]);
                 // Build a column add/remove diff so rows that differ *only* because of a
                 // schema column change aren't counted as content changes.
