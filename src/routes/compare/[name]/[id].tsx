@@ -1,11 +1,11 @@
 import {Title} from "@solidjs/meta";
 import {A, useParams} from "@solidjs/router";
-import {createEffect, createMemo, JSX, Show} from "solid-js";
+import {createEffect, createMemo, Show} from "solid-js";
 import {CompareHeader} from "~/components/CompareHeader";
 import {JsonViewer} from "~/components/JsonViewer";
 import {LoadingSpinner} from "~/components/LoadingSpinner";
 import {type DataStore, useCompare} from "~/lib/data";
-import {diffObject} from "~/lib/diff";
+import {type ObjectDiff, diffObjectSides} from "~/lib/diff";
 import {useNavHistory} from "~/lib/navHistory";
 import {buildFkMap, createDisplayNameMap, createObjectRow, outgoingDisplayTables,} from "~/lib/objectRefs";
 
@@ -42,7 +42,7 @@ export default function ObjectCompareView() {
     const from = useObjectView(() => params.name, () => params.id, cmp.fromStore);
     const to = useObjectView(() => params.name, () => params.id, cmp.toStore);
 
-    const highlights = createMemo(() => diffObject(from.row(), to.row()));
+    const objectDiff = createMemo(() => diffObjectSides(from.row(), to.row()));
 
     createEffect(() => {
         nav.push({path: `/compare/${params.name}/${params.id}?from=${cmp.fromTag()}&to=${cmp.toTag()}`, label: `⇄ ${to.displayName()}`});
@@ -50,7 +50,7 @@ export default function ObjectCompareView() {
 
     const loading = () => from.rows.loading || to.rows.loading;
 
-    const Side = (p: { label: string; tag: string; view: ReturnType<typeof useObjectView> }) => (
+    const Side = (p: { label: string; tag: string; view: ReturnType<typeof useObjectView>; highlights: ObjectDiff }) => (
         <div class="flex-1 min-w-0 space-y-2">
             <h2 class="text-sm font-semibold text-text-muted">
                 <p class="text-sm text-text-muted">{p.label} <span class="font-mono text-text">
@@ -74,7 +74,7 @@ export default function ObjectCompareView() {
                     enumValues={p.view.meta()?.enumValues}
                     enumVariantsByName={p.view.enumVariantsByName()}
                     spriteFields={new Set(p.view.meta()?.spriteFields ?? [])}
-                    highlights={highlights()}
+                    highlights={p.highlights}
                     versionTag={p.tag}
                 />
             </Show>
@@ -94,7 +94,7 @@ export default function ObjectCompareView() {
 
             <Show when={!loading()} fallback={<div class="flex justify-center py-16"><LoadingSpinner size="lg" label="Loading…"/></div>}>
                 <Show
-                    when={highlights().size > 0 || !from.row() || !to.row()}
+                    when={objectDiff().from.size > 0 || objectDiff().to.size > 0 || !from.row() || !to.row()}
                     fallback={
                         <div class="flex flex-col items-center p-4 rounded-lg bg-surface-1 border border-border text-sm text-text-muted">
                             <p>No differences between these versions.</p>
@@ -106,8 +106,8 @@ export default function ObjectCompareView() {
                     }
                 >
                     <div class="flex flex-col lg:flex-row gap-4">
-                        <Side label="From" tag={cmp.fromTag()} view={from}/>
-                        <Side label="To" tag={cmp.toTag()} view={to}/>
+                        <Side label="From" tag={cmp.fromTag()} view={from} highlights={objectDiff().from}/>
+                        <Side label="To" tag={cmp.toTag()} view={to} highlights={objectDiff().to}/>
                     </div>
                 </Show>
             </Show>

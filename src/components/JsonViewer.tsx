@@ -115,11 +115,17 @@ function highlightClass(kind: DiffKind | undefined): string {
     }
 }
 
+/** Remove `[N]` index segments so schema-derived lookup paths still resolve. */
+function stripArrayIndices(path: string): string {
+    return path.replace(/\[\d+]/g, "");
+}
+
 function JsonNode(props: JsonNodeProps) {
     const isExpandable = () =>
         props.value !== null && typeof props.value === "object";
     const [expanded, setExpanded] = createSignal(props.depth < props.maxExpandDepth);
     const highlight = () => props.highlights?.get(props.fieldPath);
+    const schemaFieldPath = createMemo(() => stripArrayIndices(props.fieldPath));
 
     createEffect(() => {
         const f = props.forceExpanded;
@@ -130,7 +136,7 @@ function JsonNode(props: JsonNodeProps) {
 
     const fkInfo = createMemo(() => {
         if (!props.fkMap || isExpandable()) return null;
-        return props.fkMap.get(props.fieldPath) ?? null;
+        return props.fkMap.get(schemaFieldPath()) ?? null;
     });
 
     const resolvedTargetTable = createMemo(() => {
@@ -142,7 +148,7 @@ function JsonNode(props: JsonNodeProps) {
         return resolveTargetTable(
             {
                 sourceTable: "",
-                sourceField: props.fieldPath,
+                sourceField: schemaFieldPath(),
                 targetTable: fk.targetTable,
                 conditionalTargets: fk.conditionalTargets
             },
@@ -170,7 +176,7 @@ function JsonNode(props: JsonNodeProps) {
     // Enum annotation for scalar values
     const enumVariant = createMemo(() => {
         if (isExpandable() || !props.enumValues) return null;
-        const variants = props.enumValues[props.fieldPath];
+        const variants = props.enumValues[schemaFieldPath()];
         if (!variants || typeof props.value !== "number") return null;
         return variants[props.value] ?? null;
     });
@@ -213,7 +219,7 @@ function JsonNode(props: JsonNodeProps) {
             fallback={
                 <span class={highlightClass(highlight())}>
                     <Show
-                        when={props.spriteFields?.has(props.fieldPath) && typeof props.value === "string" && props.value.length > 1}
+                        when={props.spriteFields?.has(schemaFieldPath()) && typeof props.value === "string" && props.value.length > 1}
                         fallback={fkTarget() ?
                             <A
                                 href={tableHref(fkTarget()!, resolvedId(), props.versionTag)}
@@ -269,8 +275,8 @@ function JsonNode(props: JsonNodeProps) {
                             <For each={entries}>
                                 {([key, val], i) => {
                                     const childPath = props.fieldPath
-                                        ? (isArray ? props.fieldPath : `${props.fieldPath}.${key}`)
-                                        : key;
+                                        ? (isArray ? `${props.fieldPath}[${key}]` : `${props.fieldPath}.${key}`)
+                                        : (isArray ? `[${key}]` : key);
                                     const childHighlight = props.highlights?.get(childPath);
                                     return (
                                         <div>

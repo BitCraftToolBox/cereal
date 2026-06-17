@@ -15,11 +15,18 @@ export type DiffKind = "added" | "removed" | "changed";
 /**
  * Map of field path → diff kind.
  *
- * Paths use the SAME convention as `JsonViewer`'s `fieldPath`: dot-separated object keys,
- * and array elements collapse onto the array's own path (no index segment). This lets the
- * resulting map be passed straight into `JsonViewer` as a highlight map.
+ * Paths use the SAME convention as `JsonViewer`'s `fieldPath`: dot-separated object keys
+ * and bracketed array indices (e.g. `items[3].name`).
  */
 export type ObjectDiff = Map<string, DiffKind>;
+
+/** Side-aware object diff paths for compare views where array indices can diverge. */
+export interface ObjectDiffSides {
+    from: ObjectDiff;
+    to: ObjectDiff;
+    /** Union-like map kept for compatibility with existing callers. */
+    merged: ObjectDiff;
+}
 
 /** Structural deep-equality for plain JSON values. */
 export function deepEqual(a: unknown, b: unknown): boolean {
@@ -51,21 +58,106 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
     return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+function pushDiff(path: string, kind: DiffKind, ...outs: ObjectDiff[]): void {
+    for (const out of outs) out.set(path, kind);
+}
+
+function arrayPath(path: string, idx: number): string {
+    return `${path}[${idx}]`;
+}
+
+/** Edit operation used for array alignment. */
+type ArrayOp = "match" | "sub" | "del" | "ins";
+
+function alignArrayOps(a: unknown[], b: unknown[]): ArrayOp[] {
+    const n = a.length;
+    const m = b.length;
+    const dp: number[][] = Array.from({length: n + 1}, () => Array<number>(m + 1).fill(0));
+    const op: ArrayOp[][] = Array.from({length: n + 1}, () => Array<ArrayOp>(m + 1).fill("match"));
+
+    for (let i = n; i >= 0; i--) {
+        for (let j = m; j >= 0; j--) {
+            if (i === n && j === m) {
+                dp[i][j] = 0;
+                continue;
+            }
+            if (i === n) {
+                dp[i][j] = 1 + dp[i][j + 1];
+                op[i][j] = "ins";
+                continue;
+            }
+            if (j === m) {
+                dp[i][j] = 1 + dp[i + 1][j];
+                op[i][j] = "del";
+                continue;
+            }
+
+            if (deepEqual(a[i], b[j])) {
+                dp[i][j] = dp[i + 1][j + 1];
+                op[i][j] = "match";
+                continue;
+            }
+
+            const sub = 1 + dp[i + 1][j + 1];
+            const del = 1 + dp[i + 1][j];
+            const ins = 1 + dp[i][j + 1];
+            const best = Math.min(sub, del, ins);
+            dp[i][j] = best;
+
+            // Tie-break to reduce churn: substitution first, then insertion, then deletion.
+            if (sub === best) op[i][j] = "sub";
+            else if (ins === best) op[i][j] = "ins";
+            else op[i][j] = "del";
+        }
+    }
+
+    const out: ArrayOp[] = [];
+    let i = 0, j = 0;
+    while (i < n || j < m) {
+        const cur = i <= n && j <= m ? op[i][j] : "match";
+        if (i === n) {
+            out.push("ins");
+            j++;
+            continue;
+        }
+        if (j === m) {
+            out.push("del");
+            i++;
+            continue;
+        }
+        out.push(cur);
+        if (cur === "match" || cur === "sub") {
+            i++;
+            j++;
+        } else if (cur === "ins") j++;
+        else i++;
+    }
+    return out;
+}
+
 /**
  * Recursively diff two JSON values, writing `path → kind` entries into `out`.
  * `a` is the "from" (older) value, `b` is the "to" (newer) value.
  */
-function diffInto(a: unknown, b: unknown, path: string, out: ObjectDiff): void {
+function diffIntoSides(
+    a: unknown,
+    b: unknown,
+    fromPath: string,
+    toPath: string,
+    fromOut: ObjectDiff,
+    toOut: ObjectDiff,
+    mergedOut: ObjectDiff,
+): void {
     if (deepEqual(a, b)) return;
 
     const aMissing = a === undefined;
     const bMissing = b === undefined;
     if (aMissing && !bMissing) {
-        out.set(path, "added");
+        pushDiff(toPath, "added", toOut, mergedOut);
         return;
     }
     if (!aMissing && bMissing) {
-        out.set(path, "removed");
+        pushDiff(fromPath, "removed", fromOut, mergedOut);
         return;
     }
 
@@ -73,30 +165,72 @@ function diffInto(a: unknown, b: unknown, path: string, out: ObjectDiff): void {
     if (isPlainObject(a) && isPlainObject(b)) {
         const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
         for (const k of keys) {
-            const childPath = path ? `${path}.${k}` : k;
-            diffInto(a[k], b[k], childPath, out);
+            const fromChild = fromPath ? `${fromPath}.${k}` : k;
+            const toChild = toPath ? `${toPath}.${k}` : k;
+            diffIntoSides(a[k], b[k], fromChild, toChild, fromOut, toOut, mergedOut);
         }
         return;
     }
 
     if (Array.isArray(a) && Array.isArray(b)) {
-        // Array elements collapse onto the array's path (matching JsonViewer). Mark the
-        // array path changed, and recurse element-wise to surface differing subfields.
-        out.set(path, "changed");
-        const len = Math.max(a.length, b.length);
-        for (let i = 0; i < len; i++) diffInto(a[i], b[i], path, out);
+        pushDiff(fromPath, "changed", fromOut, mergedOut);
+        if (toPath !== fromPath) pushDiff(toPath, "changed", toOut, mergedOut);
+        else pushDiff(toPath, "changed", toOut);
+
+        const ops = alignArrayOps(a, b);
+        let i = 0, j = 0;
+        for (const cur of ops) {
+            if (cur === "match") {
+                i++;
+                j++;
+                continue;
+            }
+            if (cur === "sub") {
+                diffIntoSides(
+                    a[i],
+                    b[j],
+                    arrayPath(fromPath, i),
+                    arrayPath(toPath, j),
+                    fromOut,
+                    toOut,
+                    mergedOut,
+                );
+                i++;
+                j++;
+                continue;
+            }
+            if (cur === "del") {
+                pushDiff(arrayPath(fromPath, i), "removed", fromOut, mergedOut);
+                i++;
+                continue;
+            }
+            pushDiff(arrayPath(toPath, j), "added", toOut, mergedOut);
+            j++;
+        }
         return;
     }
 
     // Primitive vs primitive (or type mismatch).
-    out.set(path, "changed");
+    pushDiff(fromPath, "changed", fromOut, mergedOut);
+    if (toPath !== fromPath) pushDiff(toPath, "changed", toOut, mergedOut);
+    else pushDiff(toPath, "changed", toOut);
 }
 
 /** Diff two objects (or any JSON values). Returns an empty map when equal. */
 export function diffObject(a: unknown, b: unknown): ObjectDiff {
-    const out: ObjectDiff = new Map();
-    diffInto(a, b, "", out);
-    return out;
+    return diffObjectSides(a, b).merged;
+}
+
+/**
+ * Diff two objects with side-specific paths, useful when array insertions/removals shift
+ * indices differently between the two versions.
+ */
+export function diffObjectSides(a: unknown, b: unknown): ObjectDiffSides {
+    const from: ObjectDiff = new Map();
+    const to: ObjectDiff = new Map();
+    const merged: ObjectDiff = new Map();
+    diffIntoSides(a, b, "", "", from, to, merged);
+    return {from, to, merged};
 }
 
 // ── Schema level ────────────────────────────────────────────────────────────
@@ -273,6 +407,13 @@ function keyRows(rows: Record<string, unknown>[], pk?: string): Map<string, Reco
     return map;
 }
 
+function rootPathSegment(path: string): string {
+    const dot = path.indexOf(".");
+    const first = dot === -1 ? path : path.slice(0, dot);
+    const bracket = first.indexOf("[");
+    return bracket === -1 ? first : first.slice(0, bracket);
+}
+
 /**
  * Diff a single table's rows + schema between two versions.
  *
@@ -317,7 +458,7 @@ export function diffTable(
         } else if (a && b && pk) {
             const paths = diffObject(a, b);
             for (const p of [...paths.keys()]) {
-                if (ignoreFields.has(p.split(".")[0])) paths.delete(p);
+                if (ignoreFields.has(rootPathSegment(p))) paths.delete(p);
             }
             if (paths.size > 0) {
                 rows.push({kind: "changed", id: key, paths});
