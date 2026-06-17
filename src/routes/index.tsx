@@ -2,6 +2,7 @@ import {createMemo, For, onCleanup, onMount, Show} from "solid-js";
 import {A} from "@solidjs/router";
 import {isStaticTable, useData} from "~/lib/data";
 import {useHomeState} from "~/lib/homeState";
+import {FilterToggle} from "~/components/FilterToggle";
 
 export default function Home() {
     const data = useData();
@@ -46,20 +47,6 @@ export default function Home() {
         });
     });
 
-    const Toggle = (tprops: { label: string; checked: boolean; onChange: () => void; title?: string }) => (
-        <label
-            class="flex items-center gap-1.5 cursor-pointer select-none text-sm text-text-muted hover:text-text transition-colors"
-            title={tprops.title}>
-            <input
-                type="checkbox"
-                checked={tprops.checked}
-                onChange={tprops.onChange}
-                class="w-3.5 h-3.5 accent-primary"
-            />
-            {tprops.label}
-        </label>
-    );
-
     return (
         <div class="max-w-5xl mx-auto space-y-6">
             <div class="text-center py-8 space-y-4">
@@ -102,12 +89,12 @@ export default function Home() {
                         ⇄ compare
                     </A>
                     <div class="flex items-center gap-3 sm:ml-auto flex-wrap">
-                        <Toggle label="📋 Static" checked={showStatic()} onChange={() => setShowStatic((v) => !v)}
-                                title="Show normal static (desc) tables"/>
-                        <Toggle label="🔒 Hidden" checked={showPrivate()} onChange={() => setShowPrivate((v) => !v)}
-                                title="Show hidden desc tables (no rows, only structure)"/>
-                        <Toggle label="⚙️ State" checked={showNonStatic()} onChange={() => setShowNonStatic((v) => !v)}
-                                title="Show runtime/non-static tables (any visibility, no rows, only structure)"/>
+                        <FilterToggle label="📋 Static" checked={showStatic()} onChange={() => setShowStatic((v) => !v)}
+                                      title="Show normal static (desc) tables"/>
+                        <FilterToggle label="🔒 Hidden" checked={showPrivate()} onChange={() => setShowPrivate((v) => !v)}
+                                      title="Show hidden desc tables (no rows, only structure)"/>
+                        <FilterToggle label="⚙️ State" checked={showNonStatic()} onChange={() => setShowNonStatic((v) => !v)}
+                                      title="Show runtime/non-static tables (any visibility, no rows, only structure)"/>
                     </div>
                 </div>
                 <Show

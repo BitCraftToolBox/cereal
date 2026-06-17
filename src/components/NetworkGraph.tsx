@@ -1,5 +1,5 @@
 /**
- * NetworkGraph — force-directed graph of all static tables and their FK relationships.
+ * NetworkGraph — force-directed graph of selected tables and their FK relationships.
  */
 
 import {createMemo, createSignal, For, onCleanup, onMount, Show,} from "solid-js";
@@ -11,6 +11,7 @@ export interface NetworkNode {
     id: string;
     label: string;
     isPublic: boolean;
+    isStatic: boolean;
 }
 
 export interface NetworkEdge {
@@ -35,16 +36,18 @@ const PUBLIC_COLOR = "hsl(220 65% 60%)";
 const PUBLIC_BORDER = "hsl(220 65% 45% / 0.8)";
 const HIDDEN_COLOR = "hsl(260 40% 55%)";
 const HIDDEN_BORDER = "hsl(260 40% 40% / 0.8)";
-const EDGE_COLOR = "color-mix(in srgb, var(--color-border) 50%, transparent)";
+const STATE_COLOR = "hsl(145 50% 48%)";
+const STATE_BORDER = "hsl(145 50% 36% / 0.85)";
+const EDGE_COLOR = "color-mix(in srgb, var(--color-border) 80%, transparent)";
 const EDGE_HOV = "hsl(220 65% 60% / 0.9)";
 
 function nodeColor(n: NetworkNode, hov: boolean) {
-    const base = n.isPublic ? PUBLIC_COLOR : HIDDEN_COLOR;
+    const base = !n.isStatic ? STATE_COLOR : (n.isPublic ? PUBLIC_COLOR : HIDDEN_COLOR);
     return `color-mix(in srgb, ${base} ${hov ? 95 : 75}%, transparent)`;
 }
 
 function nodeBorder(n: NetworkNode) {
-    return n.isPublic ? PUBLIC_BORDER : HIDDEN_BORDER;
+    return !n.isStatic ? STATE_BORDER : (n.isPublic ? PUBLIC_BORDER : HIDDEN_BORDER);
 }
 
 function splitLabel(label: string): string[] {
@@ -180,6 +183,10 @@ export function NetworkGraph(props: NetworkGraphProps) {
                 <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-sm" style={`background:${HIDDEN_COLOR}`}/>
                     hidden table
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm" style={`background:${STATE_COLOR}`}/>
+                    state table
                 </div>
             </div>
 

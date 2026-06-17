@@ -3,39 +3,53 @@ import {A, useNavigate} from "@solidjs/router";
 import {isStaticTable, useData} from "~/lib/data";
 import {Title} from "@solidjs/meta";
 import {useNavHistory} from "~/lib/navHistory";
+import {useHomeState} from "~/lib/homeState";
+import {FilterToggle} from "~/components/FilterToggle";
 import {type NetworkEdge, NetworkGraph, type NetworkNode} from "~/components/NetworkGraph";
 
 export default function NetworkGraphPage() {
     const data = useData();
     const nav = useNavHistory();
     const navigate = useNavigate();
+    const {showStatic, setShowStatic, showPrivate, setShowPrivate, showNonStatic, setShowNonStatic} = useHomeState();
 
     createEffect(() => {
         nav.push({path: "/graph", label: "⬡ network"});
     });
 
-    const graphData = createMemo(() => {
+    const filteredTables = createMemo(() => {
         const index = data.tableIndex();
+        if (!index) return [];
+
+        return index.filter((t) => {
+            const isStatic = isStaticTable(t.name);
+            const isPublic = t.meta.isPublic ?? true;
+            if (!isStatic && !showNonStatic()) return false;
+            if (isStatic && !isPublic && !showPrivate()) return false;
+            if (isStatic && isPublic && !showStatic()) return false;
+            return true;
+        });
+    });
+
+    const graphData = createMemo(() => {
+        const tables = filteredTables();
         const fks = data.foreignKeys?.() ?? [];
-        if (!index) return {nodes: [], edges: []};
 
-        // Only static tables (public + hidden desc tables)
-        const staticTables = index.filter(t => isStaticTable(t.name));
-        const tableSet = new Set(staticTables.map(t => t.name));
-
-        const nodes: NetworkNode[] = staticTables.map(t => ({
+        const tableSet = new Set(tables.map((t) => t.name));
+        const nodes: NetworkNode[] = tables.map((t) => ({
             id: t.name,
             label: t.name,
             isPublic: t.meta.isPublic ?? true,
+            isStatic: isStaticTable(t.name),
         }));
 
-        // Aggregate FK edges between tables, counting weight
+        // Aggregate FK edges between currently included tables.
         const edgeMap = new Map<string, number>();
         for (const fk of fks) {
             if (!tableSet.has(fk.sourceTable)) continue;
 
             const targets = fk.conditionalTargets
-                ? fk.conditionalTargets.map(c => c.targetTable)
+                ? fk.conditionalTargets.map((c) => c.targetTable)
                 : [fk.targetTable];
 
             for (const target of targets) {
@@ -68,9 +82,17 @@ export default function NetworkGraphPage() {
                 >
                     ⊞ tables
                 </A>
+                <div class="flex items-center gap-3 sm:ml-auto flex-wrap">
+                    <FilterToggle label="📋 Static" checked={showStatic()} onChange={() => setShowStatic((v) => !v)}
+                                  title="Show normal static (desc) tables"/>
+                    <FilterToggle label="🔒 Hidden" checked={showPrivate()} onChange={() => setShowPrivate((v) => !v)}
+                                  title="Show hidden desc tables (no rows, only structure)"/>
+                    <FilterToggle label="⚙️ State" checked={showNonStatic()} onChange={() => setShowNonStatic((v) => !v)}
+                                  title="Show runtime/non-static tables (any visibility, no rows, only structure)"/>
+                </div>
                 <span class="text-xs text-text-muted">
-          {graphData().nodes.length} desc tables · {graphData().edges.length} FK relationships
-        </span>
+                    {graphData().nodes.length} tables · {graphData().edges.length} FK relationships
+                </span>
             </div>
             <NetworkGraph
                 nodes={graphData().nodes}
