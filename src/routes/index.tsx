@@ -1,13 +1,11 @@
-import {createMemo, createSignal, For, onCleanup, onMount, Show} from "solid-js";
+import {createMemo, For, onCleanup, onMount, Show} from "solid-js";
 import {A} from "@solidjs/router";
 import {isStaticTable, useData} from "~/lib/data";
+import {useHomeState} from "~/lib/homeState";
 
 export default function Home() {
     const data = useData();
-    const [search, setSearch] = createSignal("");
-    const [showStatic, setShowStatic] = createSignal(true);
-    const [showPrivate, setShowPrivate] = createSignal(false);
-    const [showNonStatic, setShowNonStatic] = createSignal(false);
+    const {search, setSearch, showStatic, setShowStatic, showPrivate, setShowPrivate, showNonStatic, setShowNonStatic} = useHomeState();
     let filterRef: HTMLInputElement | undefined;
 
     onMount(() => {
