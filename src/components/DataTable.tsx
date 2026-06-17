@@ -342,7 +342,10 @@ export function DataTable(props: DataTableProps) {
                 }
 
                 if (scalarFk && value !== null && value !== undefined && value !== 0) {
-                    return <FkLink targetTable={scalarFk.targetTable} id={value} displayNames={displayNames}
+                    const resolvedTargetTable = scalarFk.conditionalTargets?.length
+                        ? resolveTargetTable(scalarFk, info.row.original, props.meta.enumValues)
+                        : scalarFk.targetTable;
+                    return <FkLink targetTable={resolvedTargetTable} id={value} displayNames={displayNames}
                                    enumVariants={scalarFk.enumConversion ? enumVariantsByField().get(scalarFk.sourceField) : undefined}/>;
                 }
 

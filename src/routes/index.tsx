@@ -114,7 +114,7 @@ export default function Home() {
                     when={filteredTables().length > 0}
                     fallback={
                         <div class="text-center text-text-muted py-8">
-                            {data.tableIndex()?.length === 0 ? "No data loaded — run npm run gen-defs first." : "No tables match your search."}
+                            {data.tableIndex()?.length === 0 ? "No data loaded — ensure CDN is accessible." : "No tables match your search."}
                         </div>
                     }
                 >

@@ -173,15 +173,14 @@ export default function TableView() {
                         >
                             <span>References</span>
                             <span class="text-text-muted text-xs">
-              {refsOpen() ? "▲" : "▼"}
-                                {" "}
+                                {refsOpen() ? "▲" : "▼"}{" "}
                                 <Show when={outgoingRefs().length > 0}>
-                <span class="ml-1">{outgoingRefs().length} outgoing</span>
-              </Show>
-              <Show when={incomingRefs().length > 0}>
-                <span class="ml-1">{incomingRefs().length} incoming</span>
-              </Show>
-            </span>
+                                    <span class="ml-1">{outgoingRefs().length} outgoing</span>
+                                </Show>
+                                <Show when={incomingRefs().length > 0}>
+                                    <span class="ml-1">{incomingRefs().length} incoming</span>
+                                </Show>
+                            </span>
                         </button>
                         <Show when={refsOpen()}>
                             <div class="px-4 py-3 space-y-3 bg-surface-0 border-t border-border">
