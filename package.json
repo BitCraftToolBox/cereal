@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "vinxi dev",
     "build": "vinxi build",
-    "preview": "vinxi build && wrangler pages dev dist",
-    "deploy": "wrangler pages deploy dist",
     "gen-defs": "tsx scripts/generate-defs.ts",
     "update-versions": "tsx scripts/update-versions.ts"
   },

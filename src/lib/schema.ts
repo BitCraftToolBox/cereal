@@ -25,9 +25,16 @@ export interface ForeignKeyMapping {
     targetField?: string;
     isList?: boolean;
     /**
+     * Unconditional multi-target reference: the field may point at any of these tables
+     * (e.g. a generic `entity_id`). When set, `targetTable` holds the first entry for
+     * backward compatibility but consumers should prefer `targetTables`.
+     */
+    targetTables?: string[];
+    /**
      * When the source field stores an enum variant *name* (string) but the target PK is
-     * the numeric enum index, set this to the enum name in DefManifest.enums so the
-     * frontend can convert: variants.indexOf(stringValue) → numeric id.
+     * the numeric enum index, set this to the canonical enum name (as produced by
+     * `schemaDerive`'s enum registry) so the frontend can convert:
+     * variants.indexOf(stringValue) → numeric id.
      */
     enumConversion?: string;
     conditionalTargets?: {
@@ -38,26 +45,19 @@ export interface ForeignKeyMapping {
 }
 
 /**
- * A named enum extracted from the DB schema, shared across tables.
- */
-export interface EnumDef {
-    name: string;
-    values: string[];
-}
-
-/**
  * Table metadata included in the version manifest.
+ *
+ * Deliberately slim: structural fields (`columns`, enum info, the top-level `enums` array) are
+ * *not* stored here — they're reconstructed at runtime from `region_schema.json` via
+ * `schemaDerive.ts`. Only row-derived (`rowCount`, `spriteFields`) and config/schema-derived
+ * scalars that are cheap to keep live in the manifest.
  */
 export interface TableMeta {
     name: string;
     primaryKey?: string;
     displayField?: string;
-    searchFields: string[];
     rowCount: number;
-    columns: string[];
     isPublic: boolean;
-    enumColumns: string[];
-    enumValues: Record<string, string>;
     spriteFields: string[];
 }
 
@@ -73,14 +73,30 @@ export interface VersionEntry {
 /**
  * A pre-computed manifest of all tables and FK mappings for a specific data version.
  * Stored in public/data/<tag>/version_<tag>.json.
+ *
+ * Note: enums are intentionally absent — derive them from the schema (`schemaDerive.ts`).
  */
 export interface DefManifest extends VersionEntry {
-    /** All named enums, deduplicated */
-    enums: EnumDef[];
     /** Metadata for all tables */
     tables: TableMeta[];
     /** Foreign key mappings across all tables */
     foreignKeys: ForeignKeyMapping[];
+}
+
+/**
+ * Every table a FK could point at: its main `targetTable`, any unconditional
+ * `targetTables` (multi-target columns like a generic `entity_id`), and every
+ * `conditionalTargets[].targetTable`. De-duplicated, with `targetTable` first.
+ *
+ * Use this anywhere the *set* of possible targets matters (schema display, display-name
+ * prefetch, incoming-ref indexing) rather than a single resolved target.
+ */
+export function allTargetTables(fk: ForeignKeyMapping): string[] {
+    const out = new Set<string>();
+    if (fk.targetTable) out.add(fk.targetTable);
+    for (const t of fk.targetTables ?? []) out.add(t);
+    for (const c of fk.conditionalTargets ?? []) if (c.targetTable) out.add(c.targetTable);
+    return [...out];
 }
 
 /**

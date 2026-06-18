@@ -3,4 +3,5 @@
 .wrangler/
 node_modules/
 dist/
+dump/
 .DS_Store

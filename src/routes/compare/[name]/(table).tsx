@@ -35,15 +35,21 @@ export default function TableCompareView() {
     const cmp = useCompare();
     const nav = useNavHistory();
 
-    const fromRows = useRows(() => params.name, cmp.fromStore);
-    const toRows = useRows(() => params.name, cmp.toStore);
+    // Resolve the viewed table to each side's *current* migration version, so an old-vs-new
+    // comparison (e.g. `deployable_desc_v2` ↔ `deployable_desc_v3`) pairs by base instead of
+    // showing the table as absent on the side that uses a different version number.
+    const fromName = () => cmp.fromStore.resolveCurrentTable(params.name);
+    const toName = () => cmp.toStore.resolveCurrentTable(params.name);
+
+    const fromRows = useRows(fromName, cmp.fromStore);
+    const toRows = useRows(toName, cmp.toStore);
 
     createEffect(() => {
         nav.push({path: `/compare/${params.name}?from=${cmp.fromTag()}&to=${cmp.toTag()}`, label: `⇄ ${params.name}`});
     });
 
-    const metaFrom = () => cmp.fromStore.getTableMeta(params.name);
-    const metaTo = () => cmp.toStore.getTableMeta(params.name);
+    const metaFrom = () => cmp.fromStore.getTableMeta(fromName());
+    const metaTo = () => cmp.toStore.getTableMeta(toName());
 
     // Both manifests must be settled before we can decide whether each side is loadable.
     const manifestsReady = () =>
@@ -51,24 +57,24 @@ export default function TableCompareView() {
     const bothLoadable = () => fromRows.canLoad() && toRows.canLoad();
 
     /** Why a side can't have its rows compared, or null when it's loadable. */
-    const sideIssue = (store: DataStore): string | null => {
-        const m = store.getTableMeta(params.name);
+    const sideIssue = (store: DataStore, name: string): string | null => {
+        const m = store.getTableMeta(name);
         if (m == null) return "is absent";
-        if (!isStaticTable(params.name)) return "contains runtime state";
+        if (!isStaticTable(name)) return "contains runtime state";
         if (!(m.isPublic ?? true)) return "is private";
         return null;
     };
-    const fromIssue = () => sideIssue(cmp.fromStore);
-    const toIssue = () => sideIssue(cmp.toStore);
+    const fromIssue = () => sideIssue(cmp.fromStore, fromName());
+    const toIssue = () => sideIssue(cmp.toStore, toName());
 
     const schema = createMemo(() => {
         const ctxA = cmp.fromStore.getTypeContext();
         const ctxB = cmp.toStore.getTypeContext();
         return diffSchema(
-            colTypeMap(params.name, cmp.fromStore),
-            colTypeMap(params.name, cmp.toStore),
-            ctxA?.schema.tables?.find((t) => t.name === params.name),
-            ctxB?.schema.tables?.find((t) => t.name === params.name),
+            colTypeMap(fromName(), cmp.fromStore),
+            colTypeMap(toName(), cmp.toStore),
+            ctxA?.schema.tables?.find((t) => t.name === fromName()),
+            ctxB?.schema.tables?.find((t) => t.name === toName()),
             ctxA && {typespace: ctxA.schema.typespace.types, idxMap: ctxA.idxMap},
             ctxB && {typespace: ctxB.schema.typespace.types, idxMap: ctxB.idxMap},
         );
@@ -95,13 +101,13 @@ export default function TableCompareView() {
         return m;
     });
 
-    const displayName = (id: string, store: DataStore): string =>
-        store.getDisplayNames(params.name)?.get(id) ?? id;
+    const displayName = (id: string, store: DataStore, name: string): string =>
+        store.getDisplayNames(name)?.get(id) ?? id;
 
     // Reactive label getter — must be a function (not an eagerly-evaluated string)
     // so that SolidJS can track the `displayNameVersion` signal read inside
     // `getDisplayNames` and re-evaluate each For-item cell when names load async.
-    const makeLabel = (id: string, store: DataStore) => () => displayName(id, store);
+    const makeLabel = (id: string, store: DataStore, name: string) => () => displayName(id, store, name);
 
     const compareHref = (id: string) =>
         `/compare/${params.name}/${encodeURIComponent(id)}?from=${cmp.fromTag()}&to=${cmp.toTag()}`;
@@ -140,6 +146,16 @@ export default function TableCompareView() {
                     <span class="px-2 py-1 rounded-md bg-surface-1 border border-border">
                         {schema().changeCount} schema change{schema().changeCount === 1 ? "" : "s"}
                     </span>
+                    <span class="px-2 py-1 rounded-md bg-surface-1 border border-border text-sm text-text-muted">From <span class="font-mono text-text">
+                        <Show when={metaFrom()} fallback={cmp.fromTag()}>
+                            <A href={`/table/${fromName()}?version=${cmp.fromTag()}`}>⊞ {fromName()} @ {cmp.fromTag()}</A>
+                        </Show>
+                    </span></span>
+                    <span class="px-2 py-1 rounded-md bg-surface-1 border border-border text-sm text-text-muted">To <span class="font-mono text-text">
+                        <Show when={metaTo()} fallback={cmp.toTag()}>
+                            <A href={`/table/${toName()}?version=${cmp.toTag()}`}>⊞ {toName()} @ {cmp.toTag()}</A>
+                        </Show>
+                    </span></span>
                 </div>
 
                 {/* Schema changes */}
@@ -160,34 +176,34 @@ export default function TableCompareView() {
                         </Show>
                         <div class="flex flex-col lg:flex-row gap-4">
                             <div class="flex-1 min-w-0 space-y-1">
-                                <p class="text-sm text-text-muted">To <span class="font-mono text-text">
+                                <p class="text-sm font-mono text-text text-center">
                                     <Show when={metaFrom()} fallback={cmp.fromTag()}>
-                                        <A href={`/table/${params.name}?version=${cmp.fromTag()}`}>⊞ {params.name} @ {cmp.fromTag()}</A>
+                                        <A href={`/table/${fromName()}?version=${cmp.fromTag()}`}>⊞ {fromName()} @ {cmp.fromTag()}</A>
                                     </Show>
-                                </span></p>
+                                </p>
                                 <Show when={metaFrom()} fallback={<p class="text-sm text-text-muted italic">Table absent.</p>}>
                                     <ColumnStructure
-                                        meta={metaFrom()!} fks={cmp.fromStore.getOutgoingRefs(params.name)}
-                                        tableName={params.name}
-                                        schemaTable={cmp.fromStore.getTypeContext()?.schema.tables?.find((t) => t.name === params.name)}
-                                        columnType={(c) => cmp.fromStore.getColumnType(params.name, c)}
+                                        meta={metaFrom()!} fks={cmp.fromStore.getOutgoingRefs(fromName())}
+                                        tableName={fromName()}
+                                        schemaTable={cmp.fromStore.getTypeContext()?.schema.tables?.find((t) => t.name === fromName())}
+                                        columnType={(c) => cmp.fromStore.getColumnType(fromName(), c)}
                                         typeCtx={cmp.fromStore.getTypeContext()}
                                         highlights={fromColHighlights()}
                                     />
                                 </Show>
                             </div>
                             <div class="flex-1 min-w-0 space-y-1">
-                                <p class="text-sm text-text-muted">To <span class="font-mono text-text">
+                                <p class="text-sm font-mono text-text text-center">
                                     <Show when={metaTo()} fallback={cmp.toTag()}>
-                                        <A href={`/table/${params.name}?version=${cmp.toTag()}`}>⊞ {params.name} @ {cmp.toTag()}</A>
+                                        <A href={`/table/${toName()}?version=${cmp.toTag()}`}>⊞ {toName()} @ {cmp.toTag()}</A>
                                     </Show>
-                                </span></p>
+                                </p>
                                 <Show when={metaTo()} fallback={<p class="text-sm text-text-muted italic">Table absent.</p>}>
                                     <ColumnStructure
-                                        meta={metaTo()!} fks={cmp.toStore.getOutgoingRefs(params.name)}
-                                        tableName={params.name}
-                                        schemaTable={cmp.toStore.getTypeContext()?.schema.tables?.find((t) => t.name === params.name)}
-                                        columnType={(c) => cmp.toStore.getColumnType(params.name, c)}
+                                        meta={metaTo()!} fks={cmp.toStore.getOutgoingRefs(toName())}
+                                        tableName={toName()}
+                                        schemaTable={cmp.toStore.getTypeContext()?.schema.tables?.find((t) => t.name === toName())}
+                                        columnType={(c) => cmp.toStore.getColumnType(toName(), c)}
                                         typeCtx={cmp.toStore.getTypeContext()}
                                         highlights={toColHighlights()}
                                     />
@@ -230,7 +246,7 @@ export default function TableCompareView() {
                                         // `label` is a getter so that the `displayNameVersion` signal
                                         // read inside `getDisplayNames` is tracked by the JSX expressions
                                         // below — without this, async name resolution never re-renders.
-                                        const label = makeLabel(r.id, store);
+                                        const label = makeLabel(r.id, store, r.kind === "removed" ? fromName() : toName());
                                         // Keyless tables use JSON-string ids that aren't routable.
                                         const linkable = (metaTo()?.primaryKey ?? metaFrom()?.primaryKey) != null;
                                         return (

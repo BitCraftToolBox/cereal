@@ -7,6 +7,7 @@
  */
 
 import type {AlgebraicType, DefManifest, SchemaTable} from "./schema";
+import {buildMigrationInfo} from "./schemaDerive";
 
 export type DiffKind = "added" | "removed" | "changed";
 
@@ -504,9 +505,7 @@ export type RowDeltaMap = Map<string, { added: number; removed: number; changed:
 /** Per-table schema change counts supplied by the route (needs both schemas). */
 export type SchemaChangeMap = Map<string, number>;
 
-function diffEnums(a: DefManifest, b: DefManifest): EnumDiff[] {
-    const mapA = new Map(a.enums.map((e) => [e.name, e.values]));
-    const mapB = new Map(b.enums.map((e) => [e.name, e.values]));
+function diffEnumMaps(mapA: Map<string, string[]>, mapB: Map<string, string[]>): EnumDiff[] {
     const out: EnumDiff[] = [];
     for (const name of new Set([...mapA.keys(), ...mapB.keys()])) {
         const va = mapA.get(name);
@@ -527,27 +526,43 @@ function diffEnums(a: DefManifest, b: DefManifest): EnumDiff[] {
 
 /**
  * Diff two version manifests. Table `changed` is derived from `schemaChanges` and/or
- * `rowDeltas` (both supplied by the route once it has the schemas / fetched rows).
+ * `rowDeltas` (both supplied by the route once it has the schemas / fetched rows). Enum diffs
+ * come from the schema-derived enum maps (`enumsA`/`enumsB`), since the manifest no longer
+ * carries enums.
+ *
+ * Migrated `_vN` tables are paired by **migration base**, taking each side's current (highest-N)
+ * version — so a `deployable_desc_v2` → `deployable_desc_v3` migration shows as a schema/row
+ * *change* on the current name, not a remove+add of distinct tables. Superseded versions are
+ * never counted. `rowDeltas` / `schemaChanges` are therefore keyed by **base name** (the route
+ * keys them the same way), while the emitted `name` is the displayed/linkable current table.
  */
 export function diffVersion(
     a: DefManifest,
     b: DefManifest,
-    opts?: { rowDeltas?: RowDeltaMap; schemaChanges?: SchemaChangeMap; fetchable?: (name: string) => boolean },
+    opts?: {
+        rowDeltas?: RowDeltaMap;
+        schemaChanges?: SchemaChangeMap;
+        fetchable?: (name: string) => boolean;
+        enumsA?: Map<string, string[]>;
+        enumsB?: Map<string, string[]>;
+    },
 ): VersionDiff {
-    const metaA = new Map(a.tables.map((t) => [t.name, t]));
-    const metaB = new Map(b.tables.map((t) => [t.name, t]));
+    const fromMig = buildMigrationInfo(a.tables.map((t) => t.name));
+    const toMig = buildMigrationInfo(b.tables.map((t) => t.name));
 
     const tables: TableEntryDiff[] = [];
-    for (const name of new Set([...metaA.keys(), ...metaB.keys()])) {
-        const inA = metaA.has(name);
-        const inB = metaB.has(name);
-        const schemaChanges = opts?.schemaChanges?.get(name) ?? 0;
-        const delta = opts?.rowDeltas?.get(name);
+    for (const base of new Set([...fromMig.currentByBase.keys(), ...toMig.currentByBase.keys()])) {
+        const fromName = fromMig.currentByBase.get(base);
+        const toName = toMig.currentByBase.get(base);
+        // Displayed/linkable name = current version on the newer side (fall back to older).
+        const name = toName ?? fromName!;
+        const schemaChanges = opts?.schemaChanges?.get(base) ?? 0;
+        const delta = opts?.rowDeltas?.get(base);
         const fetchable = opts?.fetchable?.(name) ?? true;
 
         let kind: DiffKind | null = null;
-        if (inA && !inB) kind = "removed";
-        else if (!inA && inB) kind = "added";
+        if (fromName && !toName) kind = "removed";
+        else if (!fromName && toName) kind = "added";
         else {
             const rowChanged = !!delta && (delta.added > 0 || delta.removed > 0 || delta.changed > 0);
             if (schemaChanges > 0 || rowChanged) kind = "changed";
@@ -566,5 +581,6 @@ export function diffVersion(
     }
     tables.sort((x, y) => x.name.localeCompare(y.name));
 
-    return {enums: diffEnums(a, b), tables};
+    const enums = opts?.enumsA && opts?.enumsB ? diffEnumMaps(opts.enumsA, opts.enumsB) : [];
+    return {enums, tables};
 }

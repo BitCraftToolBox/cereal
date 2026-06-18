@@ -4,7 +4,7 @@ import {DATA_CDN_BASE} from "./constants";
 import {
     type AlgebraicType,
     buildTypeIndexMap,
-    type DefManifest, EnumDef,
+    type DefManifest,
     type ForeignKeyMapping,
     getColumnTypeElement,
     type SearchIndex,
@@ -12,10 +12,25 @@ import {
     type TableMeta,
     type VersionEntry,
 } from "./schema";
+import {type DerivedSchema, deriveSchema} from "./schemaDerive";
 
-export type ResolvedTableMeta = Omit<TableMeta, "enumValues"> & {
+/**
+ * Runtime table metadata handed to components. The manifest is now slim, so structural fields
+ * (`columns`, `enumValues`) are reconstructed from the schema via `schemaDerive.ts` and merged
+ * with the manifest's row-derived fields here. The shape stays stable for downstream components.
+ */
+export interface ResolvedTableMeta {
+    name: string;
+    primaryKey?: string;
+    displayField?: string;
+    rowCount: number;
+    isPublic: boolean;
+    spriteFields: string[];
+    /** Top-level columns, in schema declaration order (schema-derived). */
+    columns: string[];
+    /** Column path → resolved enum variant values (schema-derived). */
     enumValues: Record<string, string[]>;
-};
+}
 
 export interface TableIndex {
     name: string;
@@ -37,6 +52,18 @@ export interface DataStore {
     getOutgoingRefs: (tableName: string) => ForeignKeyMapping[];
     getIncomingRefs: (tableName: string) => ForeignKeyMapping[];
     getEnum: (name: string) => string[] | undefined;
+    /** All enums for the current version (canonical name → values), schema-derived. */
+    getEnums: () => Map<string, string[]> | undefined;
+    /** Schema-derived top-level column names for a table (empty if schema not yet loaded). */
+    getColumns: (tableName: string) => string[];
+    /**
+     * Resolve a table name to the current version of its migration base (e.g. `deployable_desc`
+     * → `deployable_desc_v3` when that's the highest version present). Identity until the schema
+     * has loaded, or when the table isn't migrated.
+     */
+    resolveCurrentTable: (tableName: string) => string;
+    /** True if `tableName` is a superseded migration version (a newer one exists this snapshot). */
+    isSupersededTable: (tableName: string) => boolean;
     getColumnType: (tableName: string, columnName: string) => AlgebraicType | undefined;
     getTypeContext: () => { schema: SpacetimeDBSchema; idxMap: Map<number, string> } | undefined;
     getDisplayNames: (tableName: string) => Map<string, string> | undefined;
@@ -60,6 +87,11 @@ interface VersionCaches {
      * built from the wrong schema (causing Ref indices to resolve to the wrong type names).
      */
     idxMaps: WeakMap<SpacetimeDBSchema, Map<number, string>>;
+    /**
+     * Schema-derived structural metadata (columns, enums, pk, visibility), keyed by schema
+     * object identity for the same staleness-safety reason as `idxMaps`.
+     */
+    derived: WeakMap<SpacetimeDBSchema, DerivedSchema>;
     /** tag → tableName → rows */
     tables: Map<string, Map<string, Record<string, unknown>[]>>;
     /** tag → tableName → pk → label */
@@ -112,6 +144,7 @@ export const DataProvider: ParentComponent = (props) => {
         manifests: new Map(),
         schemas: new Map(),
         idxMaps: new WeakMap(),
+        derived: new WeakMap(),
         tables: new Map(),
         displayNames: new Map(),
         displayNameVersion,
@@ -205,18 +238,20 @@ export const DataProvider: ParentComponent = (props) => {
             return promise;
         });
 
-        const [tableIndex] = createResource(settled, ({m}): TableIndex[] => {
-            if (!m) return [];
-            const enumMap = new Map((m.enums ?? []).map((e) => [e.name, e.values]));
-            return [...m.tables].sort((a, b) => a.name.localeCompare(b.name)).map((meta) => {
-                const ev: Record<string, string[]> = {};
-                for (const [col, enumName] of Object.entries(meta.enumValues)) {
-                    const v = enumMap.get(enumName);
-                    if (v) ev[col] = v;
-                }
-                return {name: meta.name, meta: {...meta, enumValues: ev}};
-            });
-        });
+        const [tableIndex] = createResource(
+            // Re-derive when either the manifest or the schema (→ derived structure) changes.
+            () => {
+                const m = manifest();
+                if (m === undefined) return undefined;
+                return {m, d: getDerived()};
+            },
+            ({m, d}): TableIndex[] => {
+                if (!m) return [];
+                return [...m.tables]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((slim) => ({name: slim.name, meta: buildResolvedMeta(slim, slim.name, d)}));
+            },
+        );
 
         const [foreignKeys] = createResource(settled, ({m}): ForeignKeyMapping[] => m?.foreignKeys ?? []);
 
@@ -233,27 +268,57 @@ export const DataProvider: ParentComponent = (props) => {
             return map;
         }
 
-        function resolveEnums(defs: EnumDef[], vals: Record<string, string>) {
-            const enumMap = new Map((defs ?? []).map((e) => [e.name, e.values]));
-            const ev: Record<string, string[]> = {};
-            for (const [col, enumName] of Object.entries(vals)) {
-                const v = enumMap.get(enumName);
-                if (v) ev[col] = v;
+        /**
+         * Schema-derived structural metadata (columns, enums, pk, visibility) for the current
+         * version, cached by schema identity. Reactive on `schema()`; returns null until the
+         * schema has loaded — callers reading structural fields must tolerate the empty case
+         * (they re-run once the schema resolves).
+         */
+        function getDerived(): DerivedSchema | null {
+            const s = schema();
+            if (!s) return null;
+            let d = caches.derived.get(s);
+            if (!d) {
+                d = deriveSchema(s);
+                caches.derived.set(s, d);
             }
-            return ev;
+            return d;
         }
 
-        function resolveEnumValues(meta: TableMeta): Record<string, string[]> {
-            const m = manifest();
-            if (!m) return {};
-            return resolveEnums(m.enums, meta.enumValues);
+        /** Merge a slim manifest `TableMeta` with schema-derived structure into a `ResolvedTableMeta`. */
+        function buildResolvedMeta(
+            slim: TableMeta | undefined,
+            name: string,
+            d: DerivedSchema | null,
+        ): ResolvedTableMeta {
+            const dt = d?.tables.get(name);
+            const enumValues: Record<string, string[]> = {};
+            if (d && dt) {
+                for (const [col, enumName] of Object.entries(dt.enumColumnNames)) {
+                    const v = d.enums.get(enumName);
+                    if (v) enumValues[col] = v;
+                }
+            }
+            return {
+                name,
+                primaryKey: slim?.primaryKey ?? dt?.primaryKey,
+                displayField: slim?.displayField,
+                rowCount: slim?.rowCount ?? 0,
+                isPublic: slim?.isPublic ?? dt?.isPublic ?? true,
+                spriteFields: slim?.spriteFields ?? [],
+                columns: dt?.columns ?? [],
+                enumValues,
+            };
         }
 
         function getTableMeta(name: string): ResolvedTableMeta | undefined {
             const m = manifest();
-            const meta = m?.tables.find((t) => t.name === name);
-            if (!meta) return undefined;
-            return {...meta, enumValues: resolveEnumValues(meta)};
+            const d = getDerived();
+            const slim = m?.tables.find((t) => t.name === name);
+            // Known to exist if it's in the manifest OR the schema (covers schema-only tables
+            // viewed before the manifest registers them).
+            if (!slim && !d?.tables.has(name)) return undefined;
+            return buildResolvedMeta(slim, name, d);
         }
 
         const outgoingRefsMap = createMemo(() => {
@@ -276,6 +341,9 @@ export const DataProvider: ParentComponent = (props) => {
             };
             for (const fk of foreignKeys() ?? []) {
                 add(fk.targetTable, fk);
+                for (const t of fk.targetTables ?? []) {
+                    if (t !== fk.targetTable) add(t, fk);
+                }
                 for (const cond of fk.conditionalTargets ?? []) {
                     if (cond.targetTable && cond.targetTable !== fk.targetTable)
                         add(cond.targetTable, fk);
@@ -288,16 +356,15 @@ export const DataProvider: ParentComponent = (props) => {
         const syntheticDisplayNameTables = new Set(["extraction_recipe_desc"]);
 
         /**
-         * Resolve table meta for an *explicit* version, awaiting that version's manifest.
-         * Unlike `getTableMeta`, this never reads the reactive `manifest()` accessor, so it
-         * can't resolve against `undefined` (mid-load) or the wrong (previous) version while
-         * async work for `ver` is still in flight.
+         * Resolve (slim) table meta for an *explicit* version, awaiting that version's manifest.
+         * Only `primaryKey`/`displayField` are needed by display-name resolution, and both live
+         * in the manifest — so no schema load is required here. Unlike `getTableMeta`, this never
+         * reads the reactive `manifest()` accessor, so it can't resolve against `undefined`
+         * (mid-load) or the wrong (previous) version while async work for `ver` is in flight.
          */
-        async function metaForVersion(ver: string, name: string): Promise<ResolvedTableMeta | undefined> {
+        async function metaForVersion(ver: string, name: string): Promise<TableMeta | undefined> {
             const m = await loadManifest(ver);
-            const meta = m?.tables.find((t) => t.name === name);
-            if (!m || !meta) return undefined;
-            return {...meta, enumValues: resolveEnums(m.enums, meta.enumValues)};
+            return m?.tables.find((t) => t.name === name);
         }
 
         /**
@@ -448,7 +515,11 @@ export const DataProvider: ParentComponent = (props) => {
             foreignKeys,
             getOutgoingRefs: (t) => outgoingRefsMap().get(t) ?? [],
             getIncomingRefs: (t) => incomingRefsMap().get(t) ?? [],
-            getEnum: (name) => manifest()?.enums?.find((e) => e.name === name)?.values,
+            getEnum: (name) => getDerived()?.enums.get(name),
+            getEnums: () => getDerived()?.enums,
+            getColumns: (name) => getDerived()?.tables.get(name)?.columns ?? [],
+            resolveCurrentTable: (name) => getDerived()?.migration.resolveCurrent(name) ?? name,
+            isSupersededTable: (name) => getDerived()?.migration.isSuperseded(name) ?? false,
             getColumnType: (tableName, columnName) => {
                 const s = schema();
                 return s ? getColumnTypeElement(tableName, columnName, s) : undefined;

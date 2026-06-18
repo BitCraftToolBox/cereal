@@ -4,6 +4,9 @@ export default defineConfig({
   ssr: false,
   server: {
     preset: "cloudflare-pages",
+    watch: {
+      ignored: ["scripts/**"]
+    }
   },
   vite: {
     css: {

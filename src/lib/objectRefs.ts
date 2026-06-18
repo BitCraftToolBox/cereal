@@ -5,7 +5,7 @@
 
 import {type Accessor, createEffect, createMemo, createResource} from "solid-js";
 import {type DataStore, isStaticTable, type ResolvedTableMeta} from "~/lib/data";
-import {type ForeignKeyMapping, getNestedValue, resolveTargetTable, resolveTargetTableWithCondition} from "~/lib/schema";
+import {type ForeignKeyMapping, allTargetTables, getNestedValue, resolveTargetTable, resolveTargetTableWithCondition} from "~/lib/schema";
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
@@ -347,11 +347,7 @@ export function createDisplayNameMap(
 export function outgoingDisplayTables(tableName: string, data: DataStore): string[] {
     const tables = new Set<string>();
     for (const fk of data.getOutgoingRefs(tableName)) {
-        const allTargets = fk.conditionalTargets
-            ? fk.conditionalTargets.map((c) => c.targetTable)
-            : [fk.targetTable];
-        for (const t of allTargets) {
-            if (!t) continue;
+        for (const t of allTargetTables(fk)) {
             const m = data.getTableMeta(t);
             if (m?.displayField && isStaticTable(t) && (m.isPublic ?? true)) tables.add(t);
         }
@@ -366,12 +362,7 @@ export function outgoingDisplayTables(tableName: string, data: DataStore): strin
 export function allDisplayTables(tableName: string, data: DataStore): string[] {
     const tables = new Set<string>([tableName]);
     for (const fk of data.getOutgoingRefs(tableName)) {
-        const allTargets = fk.conditionalTargets
-            ? fk.conditionalTargets.map((c) => c.targetTable)
-            : [fk.targetTable];
-        for (const t of allTargets) {
-            if (t) tables.add(t);
-        }
+        for (const t of allTargetTables(fk)) tables.add(t);
     }
     for (const fk of data.getIncomingRefs(tableName)) {
         tables.add(fk.sourceTable);

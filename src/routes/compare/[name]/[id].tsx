@@ -39,8 +39,13 @@ export default function ObjectCompareView() {
     const cmp = useCompare();
     const nav = useNavHistory();
 
-    const from = useObjectView(() => params.name, () => params.id, cmp.fromStore);
-    const to = useObjectView(() => params.name, () => params.id, cmp.toStore);
+    // Resolve to each side's current migration version so an object that lives in a migrated
+    // `_vN` table is paired by base (e.g. `deployable_desc_v2` ↔ `deployable_desc_v3`).
+    const fromName = () => cmp.fromStore.resolveCurrentTable(params.name);
+    const toName = () => cmp.toStore.resolveCurrentTable(params.name);
+
+    const from = useObjectView(fromName, () => params.id, cmp.fromStore);
+    const to = useObjectView(toName, () => params.id, cmp.toStore);
 
     const objectDiff = createMemo(() => diffObjectSides(from.row(), to.row()));
 
@@ -50,12 +55,12 @@ export default function ObjectCompareView() {
 
     const loading = () => from.rows.loading || to.rows.loading;
 
-    const Side = (p: { label: string; tag: string; view: ReturnType<typeof useObjectView>; highlights: ObjectDiff }) => (
+    const Side = (p: { label: string; tag: string; name: string; view: ReturnType<typeof useObjectView>; highlights: ObjectDiff }) => (
         <div class="flex-1 min-w-0 space-y-2">
             <h2 class="text-sm font-semibold text-text-muted">
                 <p class="text-sm text-text-muted">{p.label} <span class="font-mono text-text">
                     <Show when={p.view.row()} keyed fallback={p.tag}>
-                        <A href={`/table/${params.name}/${params.id}?version=${p.tag}`}>▣ {p.view.displayName() ?? params.id} @ {p.tag}</A>
+                        <A href={`/table/${p.name}/${params.id}?version=${p.tag}`}>▣ {p.view.displayName() ?? params.id} @ {p.tag}</A>
                     </Show>
                 </span></p>
             </h2>
@@ -99,15 +104,15 @@ export default function ObjectCompareView() {
                         <div class="flex flex-col items-center p-4 rounded-lg bg-surface-1 border border-border text-sm text-text-muted">
                             <p>No differences between these versions.</p>
                             <div class="flex flex-row gap-4">
-                                <A href={`/table/${params.name}/${params.id}?version=${cmp.fromTag()}`}>▣ {from.displayName()} @ {cmp.fromTag()}</A>
-                                <A href={`/table/${params.name}/${params.id}?version=${cmp.toTag()}`}>▣ {to.displayName()} @ {cmp.toTag()}</A>
+                                <A href={`/table/${fromName()}/${params.id}?version=${cmp.fromTag()}`}>▣ {from.displayName()} @ {cmp.fromTag()}</A>
+                                <A href={`/table/${toName()}/${params.id}?version=${cmp.toTag()}`}>▣ {to.displayName()} @ {cmp.toTag()}</A>
                             </div>
                         </div>
                     }
                 >
                     <div class="flex flex-col lg:flex-row gap-4">
-                        <Side label="From" tag={cmp.fromTag()} view={from} highlights={objectDiff().from}/>
-                        <Side label="To" tag={cmp.toTag()} view={to} highlights={objectDiff().to}/>
+                        <Side label="From" tag={cmp.fromTag()} name={fromName()} view={from} highlights={objectDiff().from}/>
+                        <Side label="To" tag={cmp.toTag()} name={toName()} view={to} highlights={objectDiff().to}/>
                     </div>
                 </Show>
             </Show>

@@ -6,6 +6,7 @@ import {LoadingSpinner} from "~/components/LoadingSpinner";
 import {isStaticTable, useCompare} from "~/lib/data";
 import {type DiffKind, diffTable, diffVersion, type RowDeltaMap, type SchemaChangeMap, type SchemaDiff} from "~/lib/diff";
 import {useNavHistory} from "~/lib/navHistory";
+import {buildMigrationInfo} from "~/lib/schemaDerive";
 
 export default function VersionCompareView() {
     const cmp = useCompare();
@@ -20,60 +21,76 @@ export default function VersionCompareView() {
     const fromManifest = () => cmp.fromStore.manifest();
     const toManifest = () => cmp.toStore.manifest();
 
+    // Both schemas must be loaded before structural (column) info is available, since the
+    // manifest no longer carries column lists — they're derived from region_schema.json.
+    const schemasReady = () =>
+        cmp.fromStore.getTypeContext() != null && cmp.toStore.getTypeContext() != null;
+
+    // Logical tables, keyed by migration base: each side contributes its *current* (highest-N)
+    // version, so a migrated `_vN` table is paired by base instead of appearing as remove+add.
+    // Computed purely from manifest table names (no schema needed) so it's available early.
+    const logicalTables = createMemo((): Array<{ base: string; from?: string; to?: string }> => {
+        const a = fromManifest();
+        const b = toManifest();
+        if (!a || !b) return [];
+        const fromMig = buildMigrationInfo(a.tables.map((t) => t.name));
+        const toMig = buildMigrationInfo(b.tables.map((t) => t.name));
+        const bases = new Set([...fromMig.currentByBase.keys(), ...toMig.currentByBase.keys()]);
+        return [...bases].map((base) => ({
+            base,
+            from: fromMig.currentByBase.get(base),
+            to: toMig.currentByBase.get(base),
+        }));
+    });
+
     const fetchable = (name: string) => {
         const m = cmp.toStore.getTableMeta(name) ?? cmp.fromStore.getTableMeta(name);
         return isStaticTable(name) && (m?.isPublic ?? true);
     };
 
-    // Cheap schema-change counts from the manifests' column lists (column add/remove only).
+    // Column add/remove counts, sourced from the schema-derived column lists (both schemas
+    // loaded), keyed by migration base and paired against each side's current version.
     const schemaChanges = createMemo((): SchemaChangeMap => {
-        const a = fromManifest();
-        const b = toManifest();
         const map: SchemaChangeMap = new Map();
-        if (!a || !b) return map;
-        const metaA = new Map(a.tables.map((t) => [t.name, t]));
-        const metaB = new Map(b.tables.map((t) => [t.name, t]));
-        for (const name of new Set([...metaA.keys(), ...metaB.keys()])) {
-            const ca = metaA.get(name)?.columns ?? [];
-            const cb = metaB.get(name)?.columns ?? [];
+        if (!fromManifest() || !toManifest() || !schemasReady()) return map;
+        for (const {base, from, to} of logicalTables()) {
+            if (!from || !to) continue;
+            const ca = cmp.fromStore.getColumns(from);
+            const cb = cmp.toStore.getColumns(to);
             const sa = new Set(ca), sb = new Set(cb);
             let count = 0;
             for (const col of new Set([...ca, ...cb])) if (sa.has(col) !== sb.has(col)) count++;
-            if (count) map.set(name, count);
+            if (count) map.set(base, count);
         }
         return map;
     });
 
-    // Heavy: fetch + diff all fetchable tables for both versions.
+    // Heavy: fetch + diff all fetchable tables for both versions (current version per side).
     const [rowDeltas] = createResource(
-        () => loadRows() && fromManifest() && toManifest()
+        () => loadRows() && fromManifest() && toManifest() && schemasReady()
             ? {from: cmp.fromTag(), to: cmp.toTag()} : null,
         async (s): Promise<RowDeltaMap> => {
-            const a = fromManifest()!;
-            const b = toManifest()!;
-            const metaA = new Map(a.tables.map((t) => [t.name, t]));
-            const metaB = new Map(b.tables.map((t) => [t.name, t]));
-            const names = [...new Set([...a.tables, ...b.tables].map((t) => t.name))].filter(fetchable);
             const map: RowDeltaMap = new Map();
-            await Promise.all(names.map(async (name) => {
+            const pairs = logicalTables().filter((lt) => lt.from && lt.to && fetchable(lt.to!));
+            await Promise.all(pairs.map(async ({base, from, to}) => {
                 const [ra, rb] = await Promise.all([
-                    cmp.fromStore.fetchTableFor(s.from, name).catch(() => []),
-                    cmp.toStore.fetchTableFor(s.to, name).catch(() => []),
+                    cmp.fromStore.fetchTableFor(s.from, from!).catch(() => []),
+                    cmp.toStore.fetchTableFor(s.to, to!).catch(() => []),
                 ]);
                 // Build a column add/remove diff so rows that differ *only* because of a
                 // schema column change aren't counted as content changes.
-                const colsA = metaA.get(name)?.columns ?? [];
-                const colsB = metaB.get(name)?.columns ?? [];
+                const colsA = cmp.fromStore.getColumns(from!);
+                const colsB = cmp.toStore.getColumns(to!);
                 const setA = new Set(colsA), setB = new Set(colsB);
                 const columns: SchemaDiff["columns"] = [];
                 for (const col of new Set([...colsA, ...colsB])) {
                     if (setA.has(col) && !setB.has(col)) columns.push({column: col, kind: "removed"});
                     else if (!setA.has(col) && setB.has(col)) columns.push({column: col, kind: "added"});
                 }
-                const d = diffTable(ra, rb, metaA.get(name), metaB.get(name),
+                const d = diffTable(ra, rb, cmp.fromStore.getTableMeta(from!), cmp.toStore.getTableMeta(to!),
                     {columns, indexes: [], changeCount: columns.length});
                 if (d.added || d.removed || d.changed)
-                    map.set(name, {added: d.added, removed: d.removed, changed: d.changed});
+                    map.set(base, {added: d.added, removed: d.removed, changed: d.changed});
             }));
             return map;
         },
@@ -87,6 +104,8 @@ export default function VersionCompareView() {
             rowDeltas: rowDeltas.latest,
             schemaChanges: schemaChanges(),
             fetchable,
+            enumsA: cmp.fromStore.getEnums(),
+            enumsB: cmp.toStore.getEnums(),
         });
     });
 

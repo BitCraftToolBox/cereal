@@ -163,6 +163,23 @@ export default function TableView() {
                     </Show>
                 </div>
 
+                {/* Superseded migration version → point to the current one. */}
+                <Show when={data.isSupersededTable(params.name)}>
+                    <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/40 text-sm">
+                        <span aria-hidden="true">⚠️</span>
+                        <span>
+                            This is an old migrated version of this table.{" "}
+                            <A
+                                href={`/table/${data.resolveCurrentTable(params.name)}`}
+                                class="font-mono font-medium text-primary hover:underline"
+                            >
+                                {data.resolveCurrentTable(params.name)}
+                            </A>{" "}
+                            is the current version.
+                        </span>
+                    </div>
+                </Show>
+
                 {/* FK References — collapsible */}
                 <Show when={hasRefs()}>
                     <div class="rounded-lg border border-border overflow-hidden">

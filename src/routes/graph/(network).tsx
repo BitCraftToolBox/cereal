@@ -22,6 +22,7 @@ export default function NetworkGraphPage() {
         if (!index) return [];
 
         return index.filter((t) => {
+            if (t.name.startsWith("staged_")) return false;
             const isStatic = isStaticTable(t.name);
             const isPublic = t.meta.isPublic ?? true;
             if (!isStatic && !showNonStatic()) return false;

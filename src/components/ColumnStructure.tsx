@@ -4,6 +4,7 @@ import {AlgebraicTypeView} from "~/components/AlgebraicTypeView";
 import type {ResolvedTableMeta} from "~/lib/data";
 import type {DiffKind} from "~/lib/diff";
 import type {AlgebraicType, ForeignKeyMapping, SchemaTable, SpacetimeDBSchema} from "~/lib/schema";
+import {allTargetTables} from "~/lib/schema";
 
 export interface ColumnStructureProps {
     meta: ResolvedTableMeta;
@@ -150,14 +151,14 @@ export function ColumnStructure(props: ColumnStructureProps) {
                                     </div>
                                     <Show when={colFks().length > 0}>
                                         <div class="flex flex-wrap gap-1 mt-1">
-                                            <For each={colFks()}>
-                                                {(fk) => (
+                                            <For each={colFks().flatMap((fk) => allTargetTables(fk).map((t) => ({fk, t})))}>
+                                                {({fk, t}) => (
                                                     <A
-                                                        href={`/table/${fk.targetTable}`}
+                                                        href={`/table/${t}`}
                                                         class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-2 border border-border hover:border-primary hover:text-primary transition-colors font-mono"
-                                                        title={`${fk.sourceField} → ${fk.targetTable}.${fk.targetField ?? "id"}`}
+                                                        title={`${fk.sourceField} → ${t}.${fk.targetField ?? "id"}`}
                                                     >
-                                                        → {fk.targetTable}
+                                                        → {t}
                                                     </A>
                                                 )}
                                             </For>
