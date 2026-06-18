@@ -1,6 +1,7 @@
 import {Title} from "@solidjs/meta";
 import {A} from "@solidjs/router";
 import {createEffect, createMemo, createResource, createSignal, For, Show} from "solid-js";
+import type {TableMeta} from "~/lib/schema";
 import {CompareHeader} from "~/components/CompareHeader";
 import {LoadingSpinner} from "~/components/LoadingSpinner";
 import {isStaticTable, useCompare} from "~/lib/data";
@@ -21,6 +22,29 @@ export default function VersionCompareView() {
     const fromManifest = () => cmp.fromStore.manifest();
     const toManifest = () => cmp.toStore.manifest();
 
+    const fromTableMetaByName = createMemo(() => {
+        const m = fromManifest();
+        return new Map((m?.tables ?? []).map((t) => [t.name, t] as const));
+    });
+
+    const toTableMetaByName = createMemo(() => {
+        const m = toManifest();
+        return new Map((m?.tables ?? []).map((t) => [t.name, t] as const));
+    });
+
+    const manifestMeta = (name: string): TableMeta | undefined =>
+        toTableMetaByName().get(name) ?? fromTableMetaByName().get(name);
+
+    // During version switches Solid resources can briefly expose previous values while the new
+    // request is in flight. Require explicit tag match so compare logic never mixes versions.
+    const manifestsMatchSelection = createMemo(() => {
+        const from = cmp.fromTag();
+        const to = cmp.toTag();
+        const a = fromManifest();
+        const b = toManifest();
+        return !!a && !!b && a.tag === from && b.tag === to;
+    });
+
     // Both schemas must be loaded before structural (column) info is available, since the
     // manifest no longer carries column lists — they're derived from region_schema.json.
     const schemasReady = () =>
@@ -32,7 +56,7 @@ export default function VersionCompareView() {
     const logicalTables = createMemo((): Array<{ base: string; from?: string; to?: string }> => {
         const a = fromManifest();
         const b = toManifest();
-        if (!a || !b) return [];
+        if (!a || !b || !manifestsMatchSelection()) return [];
         const fromMig = buildMigrationInfo(a.tables.map((t) => t.name));
         const toMig = buildMigrationInfo(b.tables.map((t) => t.name));
         const bases = new Set([...fromMig.currentByBase.keys(), ...toMig.currentByBase.keys()]);
@@ -44,8 +68,22 @@ export default function VersionCompareView() {
     });
 
     const fetchable = (name: string) => {
-        const m = cmp.toStore.getTableMeta(name) ?? cmp.fromStore.getTableMeta(name);
+        const m = manifestMeta(name);
         return isStaticTable(name) && (m?.isPublic ?? true);
+    };
+
+    // Row-level diffs are only valid when *both* sides can actually be fetched.
+    const pairFetchable = (fromName: string, toName: string) => {
+        const fromMeta = fromTableMetaByName().get(fromName);
+        const toMeta = toTableMetaByName().get(toName);
+        const canFrom = fromMeta != null && isStaticTable(fromName) && (fromMeta.isPublic ?? true);
+        const canTo = toMeta != null && isStaticTable(toName) && (toMeta.isPublic ?? true);
+        return canFrom && canTo;
+    };
+
+    const singleFetchable = (name: string, side: "from" | "to") => {
+        const meta = side === "from" ? fromTableMetaByName().get(name) : toTableMetaByName().get(name);
+        return meta != null && isStaticTable(name) && (meta.isPublic ?? true);
     };
 
     // Column add/remove counts, sourced from the schema-derived column lists (both schemas
@@ -65,49 +103,110 @@ export default function VersionCompareView() {
         return map;
     });
 
-    // Heavy: fetch + diff all fetchable tables for both versions (current version per side).
-    const [rowDeltas] = createResource(
-        () => loadRows() && fromManifest() && toManifest() && schemasReady()
-            ? {from: cmp.fromTag(), to: cmp.toTag()} : null,
-        async (s): Promise<RowDeltaMap> => {
-            const map: RowDeltaMap = new Map();
-            const pairs = logicalTables().filter((lt) => lt.from && lt.to && fetchable(lt.to!));
-            await Promise.all(pairs.map(async ({base, from, to}) => {
-                const [ra, rb] = await Promise.all([
-                    cmp.fromStore.fetchTableFor(s.from, from!).catch(() => []),
-                    cmp.toStore.fetchTableFor(s.to, to!).catch(() => []),
-                ]);
-                // Build a column add/remove diff so rows that differ *only* because of a
-                // schema column change aren't counted as content changes.
-                const colsA = cmp.fromStore.getColumns(from!);
-                const colsB = cmp.toStore.getColumns(to!);
-                const setA = new Set(colsA), setB = new Set(colsB);
-                const columns: SchemaDiff["columns"] = [];
-                for (const col of new Set([...colsA, ...colsB])) {
-                    if (setA.has(col) && !setB.has(col)) columns.push({column: col, kind: "removed"});
-                    else if (!setA.has(col) && setB.has(col)) columns.push({column: col, kind: "added"});
-                }
-                const d = diffTable(ra, rb, cmp.fromStore.getTableMeta(from!), cmp.toStore.getTableMeta(to!),
-                    {columns, indexes: [], changeCount: columns.length});
-                if (d.added || d.removed || d.changed)
-                    map.set(base, {added: d.added, removed: d.removed, changed: d.changed});
+    const rowDeltaSource = createMemo(() => {
+        if (!loadRows() || !manifestsMatchSelection() || !schemasReady()) return null;
+        const from = cmp.fromTag();
+        const to = cmp.toTag();
+        const twoSided = logicalTables()
+            .filter((lt) => lt.from && lt.to && pairFetchable(lt.from!, lt.to!))
+            .map((lt) => {
+                const fromName = lt.from!;
+                const toName = lt.to!;
+                return {
+                    kind: "two-sided" as const,
+                    base: lt.base,
+                    from: fromName,
+                    to: toName,
+                    fromMeta: fromTableMetaByName().get(fromName),
+                    toMeta: toTableMetaByName().get(toName),
+                    fromCols: cmp.fromStore.getColumns(fromName),
+                    toCols: cmp.toStore.getColumns(toName),
+                };
+            });
+
+        const addedOnly = logicalTables()
+            .filter((lt) => !lt.from && lt.to && singleFetchable(lt.to, "to"))
+            .map((lt) => ({
+                kind: "added-only" as const,
+                base: lt.base,
+                to: lt.to!,
             }));
-            return map;
+
+        const removedOnly = logicalTables()
+            .filter((lt) => lt.from && !lt.to && singleFetchable(lt.from, "from"))
+            .map((lt) => ({
+                kind: "removed-only" as const,
+                base: lt.base,
+                from: lt.from!,
+            }));
+
+        return {from, to, pairs: [...twoSided, ...addedOnly, ...removedOnly]};
+    });
+
+    const [rowDeltas] = createResource(
+        rowDeltaSource,
+        async (s): Promise<{ from: string; to: string; deltas: RowDeltaMap }> => {
+            const map: RowDeltaMap = new Map();
+            await Promise.all(s.pairs.map(async (p) => {
+                if (p.kind === "two-sided") {
+                    const [ra, rb] = await Promise.all([
+                        cmp.fromStore.fetchTableFor(s.from, p.from).catch(() => null),
+                        cmp.toStore.fetchTableFor(s.to, p.to).catch(() => null),
+                    ]);
+                    // A failed fetch (404/private/network) must not be interpreted as "empty table",
+                    // or we'd report false added/removed rows. Skip row deltas for this base instead.
+                    if (!ra || !rb) return;
+                    // Build a column add/remove diff so rows that differ *only* because of a
+                    // schema column change aren't counted as content changes.
+                    const setA = new Set(p.fromCols), setB = new Set(p.toCols);
+                    const columns: SchemaDiff["columns"] = [];
+                    for (const col of new Set([...p.fromCols, ...p.toCols])) {
+                        if (setA.has(col) && !setB.has(col)) columns.push({column: col, kind: "removed"});
+                        else if (!setA.has(col) && setB.has(col)) columns.push({column: col, kind: "added"});
+                    }
+                    const d = diffTable(ra, rb, p.fromMeta, p.toMeta,
+                        {columns, indexes: [], changeCount: columns.length});
+                    if (d.added || d.removed || d.changed)
+                        map.set(p.base, {added: d.added, removed: d.removed, changed: d.changed});
+                    return;
+                }
+
+                if (p.kind === "added-only") {
+                    const rows = await cmp.toStore.fetchTableFor(s.to, p.to).catch(() => null);
+                    if (!rows) return;
+                    if (rows.length > 0) map.set(p.base, {added: rows.length, removed: 0, changed: 0});
+                    return;
+                }
+
+                const rows = await cmp.fromStore.fetchTableFor(s.from, p.from).catch(() => null);
+                if (!rows) return;
+                if (rows.length > 0) map.set(p.base, {added: 0, removed: rows.length, changed: 0});
+            }));
+            return {from: s.from, to: s.to, deltas: map};
         },
     );
 
     const versionDiff = createMemo(() => {
         const a = fromManifest();
         const b = toManifest();
-        if (!a || !b) return undefined;
+        if (!a || !b || !manifestsMatchSelection()) return undefined;
+
+        const currentFrom = cmp.fromTag();
+        const currentTo = cmp.toTag();
+        const latest = rowDeltas.latest;
+        const matchingRowDeltas = latest && latest.from === currentFrom && latest.to === currentTo
+            ? latest.deltas
+            : undefined;
+
         return diffVersion(a, b, {
-            rowDeltas: rowDeltas.latest,
+            rowDeltas: matchingRowDeltas,
             schemaChanges: schemaChanges(),
             fetchable,
             enumsA: cmp.fromStore.getEnums(),
             enumsB: cmp.toStore.getEnums(),
         });
     });
+
 
     const loading = () => versionDiff() === undefined;
 
@@ -200,5 +299,3 @@ export default function VersionCompareView() {
         </div>
     );
 }
-
-
