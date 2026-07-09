@@ -31,6 +31,8 @@
     "quest_drop_desc.required_quest_id": "quest_chain_desc",
     "quest_drop_desc.required_stage_id": "quest_stage_desc",
     "quest_stage_desc.chain_desc_id": "quest_chain_desc",
+    "stage_rewards_desc.chain_desc_id": "quest_chain_desc",
+    "clothing_desc.item_id": "collectible_desc",
 
     "ability_state.owner_entity_id": "player_state",
     "active_buff_state.entity_id": ["player_state", "enemy_state"],
