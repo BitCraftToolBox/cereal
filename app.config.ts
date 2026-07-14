@@ -3,14 +3,7 @@ import { defineConfig } from "@solidjs/start/config";
 export default defineConfig({
   ssr: false,
   server: {
-    preset: "cloudflare-pages",
-    cloudflare: {
-      pages: {
-        routes: {
-          exclude: ["/_build/*"]
-        }
-      }
-    },
+    preset: "cloudflare-pages-static",
     watch: {
       ignored: ["scripts/**"]
     }

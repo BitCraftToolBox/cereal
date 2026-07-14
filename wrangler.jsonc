@@ -1,0 +1,6 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cereal",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2025-07-15"
+}
