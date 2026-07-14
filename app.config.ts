@@ -4,6 +4,13 @@ export default defineConfig({
   ssr: false,
   server: {
     preset: "cloudflare-pages",
+    cloudflare: {
+      pages: {
+        routes: {
+          exclude: ["/_build/*"]
+        }
+      }
+    },
     watch: {
       ignored: ["scripts/**"]
     }
