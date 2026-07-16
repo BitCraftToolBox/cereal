@@ -201,6 +201,7 @@ const {mappings: foreignKeys, candidates: staticCandidates} = detectForeignKeys(
     schemaTableInfo,
     regionSchema,
     fkConfig,
+    versionTag: VERSION_TAG,
     globalEnumRegistry,
     collectTaggedUnionFieldsByName,
     collectIdFieldsFromProductForFK,

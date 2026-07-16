@@ -21,7 +21,10 @@ export interface FkDetectionConfig {
     /** Table name prefixes to exclude entirely (e.g. "staged_", "inter_module_message"). */
     ignoreTables?: string[];
     nameOverrides: Record<string, string | null>;
-    /** Target may be a single table, an array of tables (unconditional multi-target), or null. */
+    /** Target may be a single table, an array of tables (unconditional multi-target), or null.
+     *  Any entry (single string, or an element of an array) may carry a version-tag suffix
+     *  restricting it to a range of manifest version tags, e.g. "resource_state[>=2026-06-11]"
+     *  or "foo_state[>=2026-01-01,<=2026-06-01]". */
     fkOverrides: Record<string, string | string[] | null>;
     listOverrides: Record<string, string | string[] | null>;
     taggedUnionOverrides: Record<string, Record<string, string | null>>;
@@ -60,6 +63,8 @@ const PREFERRED_SOURCE_TABLES = new Set<string>([
     "deployable_state",
     "placeable_state",
     "npc_state",
+    "resource_state",
+    "placeable_state",
 ]);
 
 export type TableDataMap = Record<string, { meta: BuildTableMeta; rows: Record<string, unknown>[] }>;
@@ -69,6 +74,7 @@ interface FkDetectorDeps {
     schemaTableInfo: Map<string, SchemaInfo>;
     regionSchema: SpacetimeDBSchema;
     fkConfig: FkDetectionConfig;
+    versionTag: string;
     globalEnumRegistry: Map<string, { name: string; values: string[] }>;
     collectTaggedUnionFieldsByName: (
         elements: ProductElement[],
@@ -106,6 +112,48 @@ function leafOf(p: string): string {
 
 function parentOf(p: string): string {
     return p.includes(".") ? p.slice(0, p.lastIndexOf(".")) : "";
+}
+
+function parseTaggedTarget(raw: string): { table: string; minTag?: string; maxTag?: string } {
+    const m = raw.match(/^(.*)\[([^\]]+)]$/);
+    if (!m) return {table: raw};
+    const [, table, body] = m;
+    let minTag: string | undefined;
+    let maxTag: string | undefined;
+    for (const part of body.split(",")) {
+        const opMatch = part.trim().match(/^(<|>=)(.+)$/);
+        if (!opMatch) continue;
+        const [, op, tag] = opMatch;
+        if (op === ">=") minTag = tag;
+        else maxTag = tag;
+    }
+    return {table, minTag, maxTag};
+}
+
+function splitTag(tag: string) {
+    const match = tag.match(/^(\d{4}-\d{2}-\d{2})(?:-(\d+)$)?/);
+    if (!match) return null;
+    return [match[1], match[2]] as [string, string];
+}
+
+/* Min tag inclusive, max tag exclusive */
+export function versionTagInRange(versionTag: string, minTag?: string, maxTag?: string): boolean {
+    const current = splitTag(versionTag);
+    if (!current) return true;
+
+    if (minTag !== undefined) {
+        const min = splitTag(minTag);
+        if (min) { // should be regex validated
+            if (current[0] < min[0] || current[0] === min[0] && current[1] < min[1]) return false;
+        }
+    }
+    if (maxTag !== undefined) {
+        const max = splitTag(maxTag);
+        if (max) {
+            if (current[0] > max[0] || current[0] === max[0] && (typeof max[1] === 'undefined' || current[1] >= max[1])) return false;
+        }
+    }
+    return true;
 }
 
 function collectIdFields(
@@ -331,6 +379,7 @@ export function detectForeignKeys(deps: FkDetectorDeps): { mappings: ForeignKeyM
         schemaTableInfo,
         regionSchema,
         fkConfig,
+        versionTag,
         globalEnumRegistry,
         collectTaggedUnionFieldsByName,
         collectIdFieldsFromProductForFK,
@@ -601,7 +650,11 @@ export function detectForeignKeys(deps: FkDetectorDeps): { mappings: ForeignKeyM
     // ════════════════════════════════════════════════════════════════════════════
     function normalizeTargets(v: string | string[] | null): string[] | null {
         if (v === null) return null;
-        return Array.isArray(v) ? v : [v];
+        const raw = Array.isArray(v) ? v : [v];
+        return raw
+            .map(parseTaggedTarget)
+            .filter(({minTag, maxTag}) => versionTagInRange(versionTag, minTag, maxTag))
+            .map(({table}) => table);
     }
 
     function applyOverride(sourceName: string, fieldPath: string, raw: string | string[] | null, forceList: boolean): boolean {
