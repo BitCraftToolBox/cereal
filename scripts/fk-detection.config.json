@@ -85,6 +85,7 @@
     "extract_outcome_state.target_entity_id": ["resource_state", "placeable_state"],
     "footprint_tile_state.owner_entity_id": ["resource_state", "building_state", "project_site_state", "loot_chest_state"],
     "growth_state.entity_id": ["resource_state", "placeable_state"],
+    "growth_state.growth_recipe_id": ["resource_growth_recipe_desc", "placeable_growth_desc"],
     "health_state.entity_id": ["player_state", "enemy_state", "building_state", "placeable_state"],
     "interior_collapse_trigger_state.entity_id": ["herd_state", "building_state"],
     "interior_collapse_trigger_state.dimension_network_description_id": "building_state",

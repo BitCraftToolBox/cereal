@@ -203,26 +203,29 @@ export default function TableView() {
                             <div class="px-4 py-3 space-y-3 bg-surface-0 border-t border-border">
                                 <Show when={outgoingRefs().length > 0}>
                                     <div>
-                                        <p class="text-xs text-text-muted mb-2 uppercase tracking-wide">This table
-                                            references</p>
+                                        <p class="text-xs text-text-muted mb-2 uppercase tracking-wide">This table references</p>
                                         <div class="flex flex-wrap gap-2">
                                             <For each={outgoingRefs()}>
-                                                {(fk) => {
-                                                    const isCircular = fk.targetTable === params.name;
-                                                    return (
-                                                        <A
-                                                            href={`/table/${fk.targetTable}`}
-                                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-1 border border-border hover:border-primary hover:text-primary text-xs font-mono transition-colors"
-                                                            title={isCircular ? "Recursive/self-referential" : undefined}
-                                                        >
-                                                            <Show when={isCircular}>
-                                                                <span aria-label="Recursive reference">🔁</span>
-                                                            </Show>
-                                                            <span class="text-text-muted">{fk.sourceField} →</span>
-                                                            <span>{fk.targetTable}</span>
-                                                        </A>
-                                                    );
-                                                }}
+                                                {(fk) => (
+                                                    <For each={fk.targetTables ?? [fk.targetTable]}>
+                                                        {(target) => {
+                                                            const isCircular = target === params.name;
+                                                            return (
+                                                                <A
+                                                                    href={`/table/${target}`}
+                                                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-1 border border-border hover:border-primary hover:text-primary text-xs font-mono transition-colors"
+                                                                    title={isCircular ? "Recursive/self-referential" : undefined}
+                                                                >
+                                                                    <Show when={isCircular}>
+                                                                        <span aria-label="Recursive reference">🔁</span>
+                                                                    </Show>
+                                                                    <span class="text-text-muted">{fk.sourceField} →</span>
+                                                                    <span>{target}</span>
+                                                                </A>
+                                                            );
+                                                        }}
+                                                    </For>
+                                                )}
                                             </For>
                                         </div>
                                     </div>
