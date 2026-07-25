@@ -286,7 +286,9 @@ export default function VersionCompareView() {
                                                 <span class="text-xs text-text-muted whitespace-nowrap">{t.schemaChanges} schema</span>
                                             </Show>
                                             <Show when={!t.fetchable}>
-                                                <span class="text-xs text-text-muted">🔒</span>
+                                                <span class="text-xs text-text-muted">
+                                                    {isStaticTable(t.name) ? "🔒" : "⚙️"}
+                                                </span>
                                             </Show>
                                         </A>
                                     )}
