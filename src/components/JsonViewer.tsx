@@ -240,16 +240,20 @@ function JsonNode(props: JsonNodeProps) {
             }
         >
             {(_) => {
-                const isArray = Array.isArray(props.value);
-                const entries = isArray
-                    ? (props.value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
-                    : Object.entries(props.value as Record<string, unknown>);
-                const openBrace = isArray ? "[" : "{";
-                const closeBrace = isArray ? "]" : "}";
+                const isArray = createMemo(() => Array.isArray(props.value));
+                const entries = createMemo(() =>
+                    isArray()
+                        ? (props.value as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
+                        : Object.entries(props.value as Record<string, unknown>)
+                );
+                const openBrace = () => isArray() ? "[" : "{";
+                const closeBrace = () => isArray() ? "]" : "}";
                 // For object nodes, this object becomes the contextObj for children
-                const childContextObj = !isArray && typeof props.value === "object" && props.value !== null
-                    ? props.value as Record<string, unknown>
-                    : props.contextObj;
+                const childContextObj = createMemo(() =>
+                    !isArray() && typeof props.value === "object" && props.value !== null
+                        ? props.value as Record<string, unknown>
+                        : props.contextObj
+                );
 
                 return (
                     <>
@@ -261,7 +265,7 @@ function JsonNode(props: JsonNodeProps) {
                         >
                             {expanded() ? "▼" : "▶"}{" "}
                         </button>
-                        <span class="text-text-muted">{openBrace}</span>
+                        <span class="text-text-muted">{openBrace()}</span>
                         <Show when={highlight()}>
                             <span class={`ml-1 px-1 text-xs ${highlightClass(highlight())}`}
                                   title={`Field ${highlight()}`}>
@@ -270,18 +274,18 @@ function JsonNode(props: JsonNodeProps) {
                         </Show>
                         <Show
                             when={expanded()}
-                            fallback={<span class="text-text-muted"> ...{entries.length} items {closeBrace}</span>}
+                            fallback={<span class="text-text-muted"> ...{entries().length} items {closeBrace()}</span>}
                         >
-                            <For each={entries}>
+                            <For each={entries()}>
                                 {([key, val], i) => {
                                     const childPath = props.fieldPath
-                                        ? (isArray ? `${props.fieldPath}[${key}]` : `${props.fieldPath}.${key}`)
-                                        : (isArray ? `[${key}]` : key);
+                                        ? (isArray() ? `${props.fieldPath}[${key}]` : `${props.fieldPath}.${key}`)
+                                        : (isArray() ? `[${key}]` : key);
                                     const childHighlight = props.highlights?.get(childPath);
                                     return (
                                         <div>
                                             <span>{childIndent()}</span>
-                                            <Show when={!isArray}>
+                                            <Show when={!isArray()}>
                                                 <span class={`text-primary ${highlightClass(childHighlight)}`}>&quot;{key}&quot;</span>
                                                 <span class="text-text-muted">: </span>
                                             </Show>
@@ -289,14 +293,14 @@ function JsonNode(props: JsonNodeProps) {
                                                 value={val}
                                                 depth={props.depth + 1}
                                                 maxExpandDepth={props.maxExpandDepth}
-                                                trailing={i() < entries.length - 1}
+                                                trailing={i() < entries().length - 1}
                                                 fieldPath={childPath}
                                                 fkMap={props.fkMap}
                                                 displayNames={props.displayNames}
                                                 enumValues={props.enumValues}
                                                 enumVariantsByName={props.enumVariantsByName}
                                                 spriteFields={props.spriteFields}
-                                                contextObj={childContextObj}
+                                                contextObj={childContextObj()}
                                                 forceExpanded={props.forceExpanded}
                                                 highlights={props.highlights}
                                                 versionTag={props.versionTag}
@@ -307,7 +311,7 @@ function JsonNode(props: JsonNodeProps) {
                             </For>
                             <div>
                                 <span>{indent()}</span>
-                                <span class="text-text-muted">{closeBrace}</span>
+                                <span class="text-text-muted">{closeBrace()}</span>
                                 <Show when={props.trailing}><span class="text-text-muted">,</span></Show>
                             </div>
                         </Show>
