@@ -139,6 +139,7 @@ export default function TableView() {
                         <CompareButton
                             currentTag={data.tag()}
                             buildHref={(other) => `/compare/${params.name}?from=${other}&to=${data.tag()}`}
+                            tableName={params.name}
                         />
                     </div>
                     <Show when={meta()}>

@@ -7,7 +7,8 @@
     "dev": "vinxi dev",
     "build": "vinxi build",
     "gen-defs": "tsx scripts/generate-defs.ts",
-    "update-versions": "tsx scripts/update-versions.ts"
+    "update-versions": "tsx scripts/update-versions.ts",
+    "build-history": "tsx scripts/build-history.ts"
   },
   "dependencies": {
     "@kobalte/core": "^0.13.11",

@@ -117,6 +117,10 @@ jobs:
           npm ci
           npx tsx scripts/update-versions.ts --root-dir ../cereal-data --compress-patches ${{ inputs.compress_patches }}
 
+      - name: Run build-history script
+        working-directory: cereal
+        run: npx tsx scripts/build-history.ts --root-dir ../cereal-data
+
       - name: Push changes
         id: commit_push
         working-directory: cereal-data

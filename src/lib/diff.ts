@@ -11,6 +11,43 @@ import {buildMigrationInfo} from "./schemaDerive";
 
 export type DiffKind = "added" | "removed" | "changed";
 
+
+// ── History manifests ───────────────────────────────────────────────────────
+//
+// Shapes produced by `scripts/build-history.ts` for `history.json` and
+// `history/<base>.json`, and consumed by the frontend (`src/lib/data.tsx`) to gray out
+// no-op entries in version-compare dropdowns. Keyed by migration-base table name
+// (see `migrationBase` in `schemaDerive.ts`), not the raw (possibly `_vN`-suffixed) table name.
+
+export type TableHistoryKind = "schema" | "rows";
+
+/** One version at which a migration-base table's schema and/or row content changed. */
+export interface TableHistoryEntry {
+    version: string;
+    kind: TableHistoryKind[];
+    added?: number;
+    removed?: number;
+    changed?: number;
+    /**
+     * Set only when the *whole table* appeared or disappeared at this version (as opposed to
+     * row-level `added`/`removed` counts within a table that exists on both sides) — lets
+     * consumers bracket the versions before/after the table existed at all.
+     */
+    lifecycle?: "added" | "removed";
+}
+
+/** `history.json` — migration-base table name → its change entries, oldest-first. */
+export type TableHistory = Record<string, TableHistoryEntry[]>;
+
+/** One version at which a specific object (row) was added, removed, or changed. */
+export interface ObjectHistoryEntry {
+    version: string;
+    kind: DiffKind;
+}
+
+/** `history/<base>.json` — primary key (as string) → that object's change entries, oldest-first. */
+export type ObjectHistory = Record<string, ObjectHistoryEntry[]>;
+
 // ── Object level ────────────────────────────────────────────────────────────
 
 /**

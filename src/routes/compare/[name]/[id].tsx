@@ -89,13 +89,17 @@ export default function ObjectCompareView() {
     return (
         <div class="w-full mx-auto space-y-6">
             <Title>{`⇄ ${params.name} / ${to.displayName()} — cereal`}</Title>
-            <CompareHeader title={
-                <>
-                    <A href={`/compare/?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>Compare</A>
-                    {" "}/ <A href={`/compare/${params.name}?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>{params.name}</A>
-                    {" "}/ {to.displayName() ?? decodeURIComponent(params.id)}
-                </>
-            }/>
+            <CompareHeader
+                title={
+                    <>
+                        <A href={`/compare/?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>Compare</A>
+                        {" "}/ <A href={`/compare/${params.name}?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>{params.name}</A>
+                        {" "}/ {to.displayName() ?? decodeURIComponent(params.id)}
+                    </>
+                }
+                tableName={params.name}
+                objectId={decodeURIComponent(params.id)}
+            />
 
             <Show when={!loading()} fallback={<div class="flex justify-center py-16"><LoadingSpinner size="lg" label="Loading…"/></div>}>
                 <Show

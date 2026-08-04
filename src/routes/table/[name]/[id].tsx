@@ -104,6 +104,8 @@ export default function ObjectView() {
                         <CompareButton
                             currentTag={data.tag()}
                             buildHref={(other) => `/compare/${params.name}/${params.id}?from=${other}&to=${data.tag()}`}
+                            tableName={params.name}
+                            objectId={decodeURIComponent(params.id)}
                         />
                     </div>
                     <p class="text-sm text-text-muted font-mono">

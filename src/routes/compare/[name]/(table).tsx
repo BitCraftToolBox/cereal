@@ -126,12 +126,15 @@ export default function TableCompareView() {
     return (
         <div class="w-full mx-auto space-y-6">
             <Title>{`⇄ ${params.name} — cereal`}</Title>
-            <CompareHeader title={
-                <>
-                    <A href={`/compare/?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>Compare</A>
-                    {" "}/ {params.name}
-                </>
-            }/>
+            <CompareHeader
+                title={
+                    <>
+                        <A href={`/compare/?from=${cmp.fromTag()}&to=${cmp.toTag()}`}>Compare</A>
+                        {" "}/ {params.name}
+                    </>
+                }
+                tableName={params.name}
+            />
 
             <Show when={!loading()} fallback={<div class="flex justify-center py-16"><LoadingSpinner size="lg" label="Loading table…"/></div>}>
                 {/* Summary */}

@@ -1,17 +1,51 @@
 import {createMemo, For, JSX, Show} from "solid-js";
 import {useLocation} from "@solidjs/router";
-import {useCompare} from "~/lib/data";
+import {useCompare, useData} from "~/lib/data";
 import {useNavHistory} from "~/lib/navHistory";
 import {VersionEntry} from "~/lib/schema";
+import {computeVersionHistoryState, isNonexistentAt} from "~/lib/versionHistory";
 
 /**
  * Shared header for compare views: two version dropdowns (from = older, to = newer) that
  * rewrite the URL `from`/`to` params for the current view. The scope normalizes ordering.
  */
-export function CompareHeader(props: { title?: JSX.Element; }) {
+export function CompareHeader(props: {
+    title?: JSX.Element;
+    /**
+     * Table name to check history against (raw name — any `_vN` migration suffix is resolved
+     * to its base internally). When set, on top of the existing from/to range restriction,
+     * versions with no recorded change of their own are shown de-emphasized (grayed), and
+     * versions before the table/object existed (or after it was removed) are shown in red.
+     */
+    tableName?: string;
+    /** Narrows the history check to one object's changes within `tableName` (object pages). */
+    objectId?: string;
+}) {
     const cmp = useCompare();
+    const data = useData();
     const nav = useNavHistory();
     const location = useLocation();
+
+    const versionIndex = createMemo(() => {
+        const idx = new Map<string, number>();
+        (cmp.versions() ?? []).forEach((v, i) => idx.set(v.tag, i));
+        return idx;
+    });
+
+    const history = createMemo(() =>
+        props.tableName
+            ? computeVersionHistoryState(props.tableName, props.objectId, versionIndex(), data)
+            : undefined
+    );
+
+    const optionClass = (tag: string): string | undefined => {
+        const h = history();
+        if (!h) return undefined;
+        const idx = versionIndex().get(tag);
+        if (idx !== undefined && isNonexistentAt(idx, h.events)) return "text-red-500";
+        return h.changed.has(tag) ? undefined : "text-text-muted";
+    };
+
     const olderThanTo = createMemo(() => {
         const list = cmp.versions();
         const to = cmp.toTag();
@@ -59,7 +93,11 @@ export function CompareHeader(props: { title?: JSX.Element; }) {
                     <Show when={cmp.versions()} fallback={<option value="-">Loading…</option>}>
                         <For each={p.versions} fallback={<option value="-">None</option>}>
                             {(v) => (
-                                <option value={v.tag} disabled={v.tag === cmp.fromTag() || v.tag === cmp.toTag()}>
+                                <option
+                                    value={v.tag}
+                                    disabled={v.tag === cmp.fromTag() || v.tag === cmp.toTag()}
+                                    class={optionClass(v.tag)}
+                                >
                                     {v.tag == cmp.fromTag() ? "←" : v.tag == cmp.toTag() ? "→" : ""}{v.label && v.label !== v.tag ? `${v.tag} (${v.label})` : v.tag}
                                 </option>
                             )}

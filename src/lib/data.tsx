@@ -1,6 +1,7 @@
 import {useLocation, useSearchParams} from "@solidjs/router";
 import {Accessor, createContext, createEffect, createMemo, createResource, createSignal, ParentComponent, Resource, untrack, useContext,} from "solid-js";
 import {DATA_CDN_BASE} from "./constants";
+import {type ObjectHistory, type ObjectHistoryEntry, type TableHistory, type TableHistoryEntry} from "./diff";
 import {
     type AlgebraicType,
     buildTypeIndexMap,
@@ -67,6 +68,19 @@ export interface DataStore {
     getColumnType: (tableName: string, columnName: string) => AlgebraicType | undefined;
     getTypeContext: () => { schema: SpacetimeDBSchema; idxMap: Map<number, string> } | undefined;
     getDisplayNames: (tableName: string) => Map<string, string> | undefined;
+    /**
+     * Version-history entries for a migration-base table name (resolve with `migrationBase` first).
+     * Not version-scoped: reflects the full history across all versions. Returns `undefined` while
+     * `history.json` is still loading, or `[]` once loaded if the table has no recorded changes.
+     */
+    getTableHistory: (base: string) => TableHistoryEntry[] | undefined;
+    /**
+     * Version-history entries for one object (by primary key) within a migration-base table.
+     * Lazily fetches (and caches) that table's `history/<base>.json` on first call. Returns
+     * `undefined` while that fetch is in flight (or hasn't been kicked off yet), or `[]` once
+     * resolved if the object has no recorded changes / the table has no history file at all.
+     */
+    getObjectHistory: (base: string, id: string) => ObjectHistoryEntry[] | undefined;
     manifest: Resource<DefManifest | null>;
     schema: Resource<SpacetimeDBSchema | null>;
     searchIndex: Resource<SearchIndex | null>;
@@ -104,6 +118,11 @@ interface VersionCaches {
     inFlightManifests: Map<string, Promise<DefManifest | null>>;
     inFlightSchemas: Map<string, Promise<SpacetimeDBSchema | null>>;
     inFlightSearches: Map<string, Promise<SearchIndex | null>>;
+
+    objectHistories: Map<string, ObjectHistory | null>;
+    inFlightObjectHistories: Map<string, Promise<void>>;
+    objectHistoryVersion: Accessor<number>;
+    bumpObjectHistoryVersion: () => void;
 }
 
 interface DataRegistry {
@@ -139,7 +158,19 @@ export const DataProvider: ParentComponent = (props) => {
         }
     });
 
+    const [tableHistory] = createResource(async (): Promise<TableHistory> => {
+        try {
+            const res = await fetch(`${DATA_CDN_BASE}/history.json`);
+            if (!res.ok) throw new Error(res.statusText);
+            return await res.json() as TableHistory;
+        } catch (e) {
+            console.warn("[cereal] Could not load history.json:", e);
+            return {};
+        }
+    });
+
     const [displayNameVersion, setDisplayNameVersion] = createSignal(0);
+    const [objectHistoryVersion, setObjectHistoryVersion] = createSignal(0);
     const caches: VersionCaches = {
         manifests: new Map(),
         schemas: new Map(),
@@ -153,6 +184,10 @@ export const DataProvider: ParentComponent = (props) => {
         inFlightManifests: new Map(),
         inFlightSchemas: new Map(),
         inFlightSearches: new Map(),
+        objectHistories: new Map(),
+        inFlightObjectHistories: new Map(),
+        objectHistoryVersion,
+        bumpObjectHistoryVersion: () => setObjectHistoryVersion((v) => v + 1),
     };
 
     function createVersionedStore(tagSignal: Accessor<string>): DataStore {
@@ -425,6 +460,40 @@ export const DataProvider: ParentComponent = (props) => {
             return fetchTableFor(tagSignal(), name);
         }
 
+        function getTableHistory(base: string): TableHistoryEntry[] | undefined {
+            const h = tableHistory();
+            return h === undefined ? undefined : (h[base] ?? []);
+        }
+
+        /** Kicks off (and caches) the `history/<base>.json` fetch; idempotent. */
+        function ensureObjectHistory(base: string): void {
+            if (caches.objectHistories.has(base) || caches.inFlightObjectHistories.has(base)) return;
+            const promise = (async () => {
+                try {
+                    const res = await fetch(`${DATA_CDN_BASE}/history/${base}.json`);
+                    if (!res.ok) throw new Error(res.statusText);
+                    caches.objectHistories.set(base, await res.json() as ObjectHistory);
+                } catch (e) {
+                    console.warn(`[cereal] Could not load object history for "${base}":`, e);
+                    caches.objectHistories.set(base, null);
+                } finally {
+                    caches.inFlightObjectHistories.delete(base);
+                    caches.bumpObjectHistoryVersion();
+                }
+            })();
+            caches.inFlightObjectHistories.set(base, promise);
+        }
+
+        function getObjectHistory(base: string, id: string): ObjectHistoryEntry[] | undefined {
+            caches.objectHistoryVersion(); // reactive dep
+            const cached = caches.objectHistories.get(base);
+            if (cached === undefined) {
+                ensureObjectHistory(base);
+                return undefined;
+            }
+            return cached?.[id] ?? [];
+        }
+
         /**
          * Version-explicit row fetch + display-name population. All async name resolution flows
          * through here with an explicit `ver`, so dependent-table fetches (e.g. resource_desc
@@ -533,6 +602,8 @@ export const DataProvider: ParentComponent = (props) => {
                 caches.displayNameVersion(); // reactive dep
                 return caches.displayNames.get(tagSignal())?.get(name);
             },
+            getTableHistory,
+            getObjectHistory,
             manifest,
             schema,
             searchIndex,
