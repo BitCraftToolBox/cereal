@@ -240,5 +240,10 @@
   {
     "tag": "2026-07-27",
     "description": "Hotfix updates.\n\nDiscord patch notes: https://discord.com/channels/558439686083969035/1260246406963134496/1531352147793543228"
+  },
+  {
+    "tag": "2026-08-06",
+    "label": "1.41 - No Stone Unturned",
+    "description":"Mining profession rework.\n\nPremium: Homespun set rerun and additions.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-no-stone-unturned\n"
   }
 ]
