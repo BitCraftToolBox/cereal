@@ -20,6 +20,7 @@
     "interior_spawn_desc.traveler_ruin_entity_id": "enemy_ai_params_desc",
     "interior_spawn_desc.paving_id": "paving_tile_desc",
     "equipment_preset_knowledge_desc.knowledge_id": "secondary_knowledge_desc",
+    "equipment_desc.equipment_buff_id": "buff_desc",
     "empire_rank_requirement": "empire_rank_desc",
     "on_destroy_yield_resource_id": "resource_desc",
     "consumed_resource": "resource_desc",
