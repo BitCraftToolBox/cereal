@@ -255,5 +255,10 @@
     "tag": "2026-09-03",
     "label": "1.43 - Digging Up Something New",
     "description": "Foraging profession rework, removal of Uncharted temporary regions.\n\nPremium: Wrangler rerun and additions.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-digging-up-something-new"
+  },
+  {
+    "tag": "2026-09-21",
+    "label": "SpacetimeDB 2.10",
+    "description": "Migration to new SpacetimeDB version. Various bugfixes.\n\nSteam post: https://store.steampowered.com/news/app/3454650/view/697650257439228781"
   }
 ]
