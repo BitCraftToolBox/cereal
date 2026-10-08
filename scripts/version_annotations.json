@@ -258,7 +258,12 @@
   },
   {
     "tag": "2026-09-21",
-    "label": "SpacetimeDB 2.10",
-    "description": "Migration to new SpacetimeDB version. Various bugfixes.\n\nSteam post: https://store.steampowered.com/news/app/3454650/view/697650257439228781"
+    "label": "1.44 - SpacetimeDB 2.10",
+    "description": "Migration to new SpacetimeDB version. Various bugfixes.\nClient-only update 3 days later is labelled 1.44, but is technically distinct.\nBitCraft news (client update): https://bitcraftonline.com/news/patch-notes-1-44\nSteam post (SpacetimeDB update): https://store.steampowered.com/news/app/3454650/view/697650257439228781"
+  },
+  {
+    "tag": "2026-10-08",
+    "label": "1.45 - Quality-of-Life Improvements & Bug Fixes",
+    "description": "QoL and bug fixes.\n\nMostly multiple tracking targets (quests, resources, enemies, buildings).\nBitCraft news: https://bitcraftonline.com/news/patch-notes-1-45-quality-of-life-improvements-and-bug-fixes"
   }
 ]
