@@ -265,5 +265,10 @@
     "tag": "2026-10-08",
     "label": "1.45 - Quality-of-Life Improvements & Bug Fixes",
     "description": "QoL and bug fixes.\n\nMostly multiple tracking targets (quests, resources, enemies, buildings).\nBitCraft news: https://bitcraftonline.com/news/patch-notes-1-45-quality-of-life-improvements-and-bug-fixes"
+  },
+  {
+    "tag": "2026-10-22",
+    "label": "1.46 - Autumn Takes Root",
+    "description": "Hunting Update, River Platforms, Autumn Seasonal Content\n\nBitCraft news: https://bitcraftonline.com/news/patch-notes-autumn-takes-root"
   }
 ]
