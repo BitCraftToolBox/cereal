@@ -35,7 +35,7 @@
     "stage_rewards_desc.chain_desc_id": "quest_chain_desc",
     "clothing_desc.item_id": "collectible_desc",
 
-    "attached_herds_state.entity_id": ["resource_state", "building_state"],
+    "attached_herds_state.entity_id": ["resource_state", "building_state", "placeable_state[>=2026-10-22]"],
     "ability_state.owner_entity_id": "player_state",
     "active_buff_state.entity_id": ["player_state", "enemy_state"],
     "attack_outcome_state.entity_id": ["player_state", "enemy_state", "building_state"],
