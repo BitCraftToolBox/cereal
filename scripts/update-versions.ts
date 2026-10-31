@@ -266,10 +266,15 @@ fs.writeFileSync(VERSIONS_FILE, JSON.stringify(sortedManifest, null, 2), "utf-8"
 console.log(`\nWrote ${VERSIONS_FILE} with ${sortedManifest.length} entries`);
 
 const latest = sortedManifest[0];
+// A "release" is a version whose label starts with a version number (e.g. "1.46 - Autumn Takes Root").
+const latestRelease = sortedManifest.find((v) => v.label && /^\d\.\d{1,3}/.test(v.label));
 const latestData = {
     tag: latest?.tag ?? null,
     label: latest?.label ?? null,
     description: latest?.description ?? null,
+    releaseTag: latestRelease?.tag ?? null,
+    releaseLabel: latestRelease?.label ?? null,
+    releaseDescription: latestRelease?.description ?? null,
 };
 fs.writeFileSync(LATEST_FILE, JSON.stringify(latestData, null, 2), "utf-8");
 console.log(`Wrote ${LATEST_FILE}`);
