@@ -183,6 +183,7 @@
     "required_knowledges_to_convert": "secondary_knowledge_desc",
     "required_items_to_start": "item_desc",
     "required_items_to_interact_with_reward": "item_desc",
+    "acceptable_pavements": "paving_tile_desc",
     "quest_chain_desc.stages": "quest_stage_desc",
     "building_function_type_mapping_desc.desc_ids": "building_desc",
     "interior_network_desc.child_interior_instances": "interior_instance_desc",
@@ -195,6 +196,7 @@
     "cargo_desc.on_destroy_yield_cargos": "cargo_desc",
     "claim_tech_desc.requirements": "claim_tech_desc",
     "claim_tech_desc.unlocks_techs": "claim_tech_desc",
+    "claim_tech_desc.blocking_claim_techs": "claim_tech_desc",
     "required_claim_tech_ids": "claim_tech_desc",
     "required_achievements": "achievement_desc",
     "interior_spawn_desc.loot_chests": "loot_chest_desc",
@@ -223,7 +225,8 @@
       "AddToToolbelt": "item_desc",
       "DeployableToggle": "collectible_desc",
       "Emote": "collectible_desc",
-      "EquipPreset": null
+      "EquipPreset": null,
+      "PlaceablePlace": "placeable_desc"
     },
     "CompletionCondition": {
       "PaddingNone": null,
