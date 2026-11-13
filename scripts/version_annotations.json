@@ -274,6 +274,15 @@
   {
     "tag": "2026-11-10",
     "label": "1.99 - Starfell Reawakened",
-    "description": "1.0 Pre-patch.\n\nidk what to say. There's claim changes and stuff too but like what.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-starfell-reawakened"
+    "description": "1.0 Pre-patch\n\nClaim progression changes, farming rework, ocean platforms.\nBitCraft news: https://bitcraftonline.com/news/patch-notes-starfell-reawakened\nBitCraft news (1.0 announcement): https://bitcraftonline.com/news/bitcraft-will-be-leaving-early-access-on-nov-13th"
+  },
+  {
+    "tag": "2026-11-13",
+    "description": "1.0 Pre-release update.\n\nPointing automation at release server ahead of launch."
+  },
+  {
+    "tag": "2026-11-13-2",
+    "label": "",
+    "description": "New world launch, leaving Early Access.\n\n\nBitCraft news:"
   }
 ]
