@@ -13,7 +13,7 @@ import type {AlgebraicType} from "~/lib/schema";
 function useRows(tableName: () => string, store: DataStore) {
     const canLoad = () => {
         const m = store.getTableMeta(tableName());
-        return m != null && isStaticTable(tableName()) && (m.isPublic ?? true);
+        return m != null && isStaticTable(tableName()) && m.hasRows;
     };
     const [rows] = createResource(
         () => canLoad() ? {tag: store.tag(), name: tableName()} : null,
@@ -61,7 +61,7 @@ export default function TableCompareView() {
         const m = store.getTableMeta(name);
         if (m == null) return "is absent";
         if (!isStaticTable(name)) return "contains runtime state";
-        if (!(m.isPublic ?? true)) return "is private";
+        if (!m.hasRows) return m.isPublic ? "has no data loaded" : "is private";
         return null;
     };
     const fromIssue = () => sideIssue(cmp.fromStore, fromName());

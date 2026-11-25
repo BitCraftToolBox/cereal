@@ -70,21 +70,21 @@ export default function VersionCompareView() {
 
     const fetchable = (name: string) => {
         const m = manifestMeta(name);
-        return isStaticTable(name) && (m?.isPublic ?? true);
+        return isStaticTable(name) && m?.hasRows;
     };
 
     // Row-level diffs are only valid when *both* sides can actually be fetched.
     const pairFetchable = (fromName: string, toName: string) => {
         const fromMeta = fromTableMetaByName().get(fromName);
         const toMeta = toTableMetaByName().get(toName);
-        const canFrom = fromMeta != null && isStaticTable(fromName) && (fromMeta.isPublic ?? true);
-        const canTo = toMeta != null && isStaticTable(toName) && (toMeta.isPublic ?? true);
+        const canFrom = fromMeta != null && isStaticTable(fromName) && fromMeta.hasRows;
+        const canTo = toMeta != null && isStaticTable(toName) && toMeta.hasRows;
         return canFrom && canTo;
     };
 
     const singleFetchable = (name: string, side: "from" | "to") => {
         const meta = side === "from" ? fromTableMetaByName().get(name) : toTableMetaByName().get(name);
-        return meta != null && isStaticTable(name) && (meta.isPublic ?? true);
+        return meta != null && isStaticTable(name) && meta.hasRows;
     };
 
     // Column add/remove counts, sourced from the schema-derived column lists (both schemas

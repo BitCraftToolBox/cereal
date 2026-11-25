@@ -97,7 +97,7 @@ export default function TableView() {
     // Only attempt to load once the manifest is available (meta !== undefined) AND the table is static/public
     const canLoad = () => {
         const m = meta();
-        return m != null && isStaticTable(params.name) && (m.isPublic ?? true);
+        return m != null && isStaticTable(params.name) && m.hasRows;
     };
 
     const [rows] = createResource(

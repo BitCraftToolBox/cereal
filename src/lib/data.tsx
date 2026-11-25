@@ -25,7 +25,10 @@ export interface ResolvedTableMeta {
     primaryKey?: string;
     displayField?: string;
     rowCount: number;
+    /** Table access per the schema (or manifest). Says nothing about whether rows were dumped. */
     isPublic: boolean;
+    /** True when dumped rows exist and can be fetched (static, public, in the manifest). */
+    hasRows: boolean;
     spriteFields: string[];
     /** Top-level columns, in schema declaration order (schema-derived). */
     columns: string[];
@@ -393,9 +396,9 @@ export const DataProvider: ParentComponent = (props) => {
                 primaryKey: slim?.primaryKey ?? dt?.primaryKey,
                 displayField: slim?.displayField,
                 rowCount: slim?.rowCount ?? 0,
-                // Tables with no manifest entry (global-only) have no dumped rows; treat them like
-                // hidden tables so every "can we load rows?" gate (all keyed on isPublic) says no.
-                isPublic: slim ? slim.isPublic : dt?.origin === "global" ? false : (dt?.isPublic ?? true),
+                isPublic: slim?.isPublic ?? dt?.isPublic ?? true,
+                // Only manifest entries have dumped rows (global-only tables never do).
+                hasRows: slim?.isPublic ?? false,
                 spriteFields: slim?.spriteFields ?? [],
                 columns: dt?.columns ?? [],
                 enumValues,

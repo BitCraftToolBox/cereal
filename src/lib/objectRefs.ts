@@ -71,7 +71,7 @@ export function createObjectRow(
     const isFetchable = createMemo(() => {
         const m = meta();
         if (!m) return false;
-        return isStaticTable(tableName()) && (m.isPublic ?? true);
+        return isStaticTable(tableName()) && m.hasRows;
     });
 
     const [rows] = createResource(
@@ -243,7 +243,7 @@ export function createIncomingResults(
     const fetchableTables = createMemo(() =>
         [...new Set(specs().map((s) => s.fk.sourceTable))].filter((t) => {
             const m = data.getTableMeta(t);
-            return m !== undefined && isStaticTable(t) && (m.isPublic ?? true);
+            return m !== undefined && isStaticTable(t) && m.hasRows;
         }),
     );
 
@@ -349,7 +349,7 @@ export function outgoingDisplayTables(tableName: string, data: DataStore): strin
     for (const fk of data.getOutgoingRefs(tableName)) {
         for (const t of allTargetTables(fk)) {
             const m = data.getTableMeta(t);
-            if (m?.displayField && isStaticTable(t) && (m.isPublic ?? true)) tables.add(t);
+            if (m?.displayField && isStaticTable(t) && m.hasRows) tables.add(t);
         }
     }
     return [...tables];
@@ -369,7 +369,7 @@ export function allDisplayTables(tableName: string, data: DataStore): string[] {
     }
     return [...tables].filter((t) => {
         const m = data.getTableMeta(t);
-        return m?.displayField && isStaticTable(t) && (m.isPublic ?? true);
+        return m?.displayField && isStaticTable(t) && m.hasRows;
     });
 }
 

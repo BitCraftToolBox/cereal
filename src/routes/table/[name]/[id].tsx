@@ -20,7 +20,7 @@ export default function ObjectView() {
     createEffect(() => {
         const m = data.getTableMeta(params.name);
         if (!m) return;
-        if (!isStaticTable(params.name) || !(m.isPublic ?? true)) {
+        if (!isStaticTable(params.name) || !m.hasRows) {
             navigate(`/table/${params.name}`, {replace: true});
         }
     });
