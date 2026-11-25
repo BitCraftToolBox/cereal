@@ -4,6 +4,7 @@ import {createEffect, createResource, createSignal, For, Show, Suspense} from "s
 import {ColumnStructure} from "~/components/ColumnStructure";
 import {CompareButton} from "~/components/CompareButton";
 import {DataTable} from "~/components/DataTable";
+import {OriginTag} from "~/components/OriginTag";
 import {LoadingSpinner} from "~/components/LoadingSpinner";
 import {TableNotFound} from "~/components/NotFound";
 import {isStaticTable, type ResolvedTableMeta, useData} from "~/lib/data";
@@ -17,7 +18,7 @@ function CollapsibleSchema(props: {
 }) {
     const data = useData();
     const [open, setOpen] = createSignal(false);
-    const typeCtx = () => data.getTypeContext();
+    const typeCtx = () => data.getTypeContext(props.tableName);
     const schemaTable = () => typeCtx()?.schema.tables?.find((t) => t.name === props.tableName);
     return (
         <div class="rounded-lg border border-border overflow-hidden">
@@ -113,7 +114,7 @@ export default function TableView() {
     const hasRefs = () => outgoingRefs().length > 0 || incomingRefs().length > 0;
     const tableNotFound = () => !data.tableIndex.loading && data.getTableMeta(params.name) == null;
 
-    const typeCtx = () => data.getTypeContext();
+    const typeCtx = () => data.getTypeContext(params.name);
     const schemaTable = () => typeCtx()?.schema.tables?.find((t) => t.name === params.name);
     const columnType = (col: string) => data.getColumnType(params.name, col);
 
@@ -144,10 +145,11 @@ export default function TableView() {
                     </div>
                     <Show when={meta()}>
                         {(m) => (
-                            <div class="flex gap-2 text-xs text-text-muted">
+                            <div class="flex gap-2 items-center text-xs text-text-muted">
+                                <OriginTag origin={m().origin}/>
                                 <Show when={!m().isPublic}>
                                     <span class="px-2 py-1 rounded-sm bg-surface-2 border border-border"
-                                          title="Private table — no data available">🔒 Private</span>
+                                          title="Private table or no data available">🔒 Private</span>
                                 </Show>
                                 <Show when={!isStaticTable(params.name)}>
                                     <span
@@ -163,6 +165,19 @@ export default function TableView() {
                         )}
                     </Show>
                 </div>
+
+                {/* Region/global declarations disagree → region is shown. */}
+                <Show when={(meta()?.schemaMismatches?.length ?? 0) > 0}>
+                    <div class="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/40 text-sm">
+                        <div>
+                            <span aria-hidden="true">⚠️</span>{" "}
+                            The region and global module schemas declare this table differently. Showing the region schema.
+                        </div>
+                        <ul class="list-disc pl-10 mt-1 text-xs text-text-muted">
+                            <For each={meta()!.schemaMismatches}>{(d) => <li>{d}</li>}</For>
+                        </ul>
+                    </div>
+                </Show>
 
                 {/* Superseded migration version → point to the current one. */}
                 <Show when={data.isSupersededTable(params.name)}>

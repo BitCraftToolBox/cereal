@@ -46,9 +46,10 @@ export default function VersionCompareView() {
     });
 
     // Both schemas must be loaded before structural (column) info is available, since the
-    // manifest no longer carries column lists — they're derived from region_schema.json.
+    // manifest no longer carries column lists — they're derived from region_schema.json
+    // (merged with global_schema.json).
     const schemasReady = () =>
-        cmp.fromStore.getTypeContext() != null && cmp.toStore.getTypeContext() != null;
+        cmp.fromStore.isStructureReady() && cmp.toStore.isStructureReady();
 
     // Logical tables, keyed by migration base: each side contributes its *current* (highest-N)
     // version, so a migrated `_vN` table is paired by base instead of appearing as remove+add.

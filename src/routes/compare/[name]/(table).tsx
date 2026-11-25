@@ -68,8 +68,8 @@ export default function TableCompareView() {
     const toIssue = () => sideIssue(cmp.toStore, toName());
 
     const schema = createMemo(() => {
-        const ctxA = cmp.fromStore.getTypeContext();
-        const ctxB = cmp.toStore.getTypeContext();
+        const ctxA = cmp.fromStore.getTypeContext(fromName());
+        const ctxB = cmp.toStore.getTypeContext(toName());
         return diffSchema(
             colTypeMap(fromName(), cmp.fromStore),
             colTypeMap(toName(), cmp.toStore),
@@ -188,9 +188,9 @@ export default function TableCompareView() {
                                     <ColumnStructure
                                         meta={metaFrom()!} fks={cmp.fromStore.getOutgoingRefs(fromName())}
                                         tableName={fromName()}
-                                        schemaTable={cmp.fromStore.getTypeContext()?.schema.tables?.find((t) => t.name === fromName())}
+                                        schemaTable={cmp.fromStore.getTypeContext(fromName())?.schema.tables?.find((t) => t.name === fromName())}
                                         columnType={(c) => cmp.fromStore.getColumnType(fromName(), c)}
-                                        typeCtx={cmp.fromStore.getTypeContext()}
+                                        typeCtx={cmp.fromStore.getTypeContext(fromName())}
                                         highlights={fromColHighlights()}
                                     />
                                 </Show>
@@ -205,9 +205,9 @@ export default function TableCompareView() {
                                     <ColumnStructure
                                         meta={metaTo()!} fks={cmp.toStore.getOutgoingRefs(toName())}
                                         tableName={toName()}
-                                        schemaTable={cmp.toStore.getTypeContext()?.schema.tables?.find((t) => t.name === toName())}
+                                        schemaTable={cmp.toStore.getTypeContext(toName())?.schema.tables?.find((t) => t.name === toName())}
                                         columnType={(c) => cmp.toStore.getColumnType(toName(), c)}
-                                        typeCtx={cmp.toStore.getTypeContext()}
+                                        typeCtx={cmp.toStore.getTypeContext(toName())}
                                         highlights={toColHighlights()}
                                     />
                                 </Show>

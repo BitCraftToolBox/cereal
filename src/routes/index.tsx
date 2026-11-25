@@ -1,5 +1,6 @@
 import {createMemo, For, onCleanup, onMount, Show} from "solid-js";
 import {A} from "@solidjs/router";
+import {OriginTag} from "~/components/OriginTag";
 import {isStaticTable, useData} from "~/lib/data";
 import {useHomeState} from "~/lib/homeState";
 import {FilterToggle} from "~/components/FilterToggle";
@@ -117,6 +118,7 @@ export default function Home() {
                                         {table.name}
                                     </div>
                                     <div class="flex items-center gap-3 mt-2 text-xs text-text-muted">
+                                        <OriginTag origin={table.meta.origin} mismatches={table.meta.schemaMismatches}/>
                                         <Show when={!table.meta.isPublic}>
                                             <span title="Private table">🔒</span>
                                         </Show>

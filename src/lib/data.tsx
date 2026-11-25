@@ -13,7 +13,7 @@ import {
     type TableMeta,
     type VersionEntry,
 } from "./schema";
-import {type DerivedSchema, deriveSchema} from "./schemaDerive";
+import {type DerivedSchema, deriveMergedSchema, type TableOrigin} from "./schemaDerive";
 
 /**
  * Runtime table metadata handed to components. The manifest is now slim, so structural fields
@@ -31,6 +31,13 @@ export interface ResolvedTableMeta {
     columns: string[];
     /** Column path → resolved enum variant values (schema-derived). */
     enumValues: Record<string, string[]>;
+    /** Which module schema(s) declare the table: region only, global only, or both. */
+    origin: TableOrigin;
+    /**
+     * Only for `origin === "both"` when the region and global declarations disagree. The region
+     * declaration is what's displayed. Absent when identical.
+     */
+    schemaMismatches?: string[];
 }
 
 export interface TableIndex {
@@ -55,6 +62,8 @@ export interface DataStore {
     getEnum: (name: string) => string[] | undefined;
     /** All enums for the current version (canonical name → values), schema-derived. */
     getEnums: () => Map<string, string[]> | undefined;
+    /** True once schema-derived structure (columns, enums, origins) is available for this version. */
+    isStructureReady: () => boolean;
     /** Schema-derived top-level column names for a table (empty if schema not yet loaded). */
     getColumns: (tableName: string) => string[];
     /**
@@ -66,7 +75,13 @@ export interface DataStore {
     /** True if `tableName` is a superseded migration version (a newer one exists this snapshot). */
     isSupersededTable: (tableName: string) => boolean;
     getColumnType: (tableName: string, columnName: string) => AlgebraicType | undefined;
-    getTypeContext: () => { schema: SpacetimeDBSchema; idxMap: Map<number, string> } | undefined;
+    /**
+     * Type context (schema + idxMap) of the module schema that *owns* `tableName` — region if the
+     * region schema declares it, else global. Type `Ref` indices are only meaningful against
+     * their own schema, so always pass the table whose types you intend to render. Without a
+     * table name, returns the region context (global if there is no region schema).
+     */
+    getTypeContext: (tableName?: string) => { schema: SpacetimeDBSchema; idxMap: Map<number, string> } | undefined;
     getDisplayNames: (tableName: string) => Map<string, string> | undefined;
     /**
      * Version-history entries for a migration-base table name (resolve with `migrationBase` first).
@@ -82,7 +97,10 @@ export interface DataStore {
      */
     getObjectHistory: (base: string, id: string) => ObjectHistoryEntry[] | undefined;
     manifest: Resource<DefManifest | null>;
+    /** Region module schema. */
     schema: Resource<SpacetimeDBSchema | null>;
+    /** Global module schema (null when the version has none, e.g. not backfilled). */
+    globalSchema: Resource<SpacetimeDBSchema | null>;
     searchIndex: Resource<SearchIndex | null>;
     tag: Accessor<string>;
 }
@@ -94,6 +112,7 @@ export function isStaticTable(name: string): boolean {
 interface VersionCaches {
     manifests: Map<string, DefManifest | null>;
     schemas: Map<string, SpacetimeDBSchema | null>;
+    globalSchemas: Map<string, SpacetimeDBSchema | null>;
     /**
      * Type-index maps keyed by the *schema object identity* (not by tag). Keying by tag is
      * unsafe: while a new version's schema is still loading, `schema()` transiently returns
@@ -105,7 +124,7 @@ interface VersionCaches {
      * Schema-derived structural metadata (columns, enums, pk, visibility), keyed by schema
      * object identity for the same staleness-safety reason as `idxMaps`.
      */
-    derived: WeakMap<SpacetimeDBSchema, DerivedSchema>;
+    derived: WeakMap<SpacetimeDBSchema, { global: SpacetimeDBSchema | null; derived: DerivedSchema }>;
     /** tag → tableName → rows */
     tables: Map<string, Map<string, Record<string, unknown>[]>>;
     /** tag → tableName → pk → label */
@@ -117,6 +136,7 @@ interface VersionCaches {
     /** Deduplication: in-flight fetches for manifests and schemas */
     inFlightManifests: Map<string, Promise<DefManifest | null>>;
     inFlightSchemas: Map<string, Promise<SpacetimeDBSchema | null>>;
+    inFlightGlobalSchemas: Map<string, Promise<SpacetimeDBSchema | null>>;
     inFlightSearches: Map<string, Promise<SearchIndex | null>>;
 
     objectHistories: Map<string, ObjectHistory | null>;
@@ -174,6 +194,7 @@ export const DataProvider: ParentComponent = (props) => {
     const caches: VersionCaches = {
         manifests: new Map(),
         schemas: new Map(),
+        globalSchemas: new Map(),
         idxMaps: new WeakMap(),
         derived: new WeakMap(),
         tables: new Map(),
@@ -183,6 +204,7 @@ export const DataProvider: ParentComponent = (props) => {
         searchIndexes: new Map(),
         inFlightManifests: new Map(),
         inFlightSchemas: new Map(),
+        inFlightGlobalSchemas: new Map(),
         inFlightSearches: new Map(),
         objectHistories: new Map(),
         inFlightObjectHistories: new Map(),
@@ -222,28 +244,42 @@ export const DataProvider: ParentComponent = (props) => {
 
         const [manifest] = createResource(tagSignal, loadManifest);
 
-        const [schema] = createResource(tagSignal, async (ver): Promise<SpacetimeDBSchema | null> => {
-            if (!ver || ver === "__pending__") return null;
-            if (caches.schemas.has(ver)) return caches.schemas.get(ver)!;
-            if (caches.inFlightSchemas.has(ver)) return caches.inFlightSchemas.get(ver)!;
+        /** Fetch (deduped + cached) one of a version's module schemas. */
+        function loadSchemaFile(
+            ver: string,
+            file: string,
+            cache: Map<string, SpacetimeDBSchema | null>,
+            inFlight: Map<string, Promise<SpacetimeDBSchema | null>>,
+        ): Promise<SpacetimeDBSchema | null> {
+            if (!ver || ver === "__pending__") return Promise.resolve(null);
+            if (cache.has(ver)) return Promise.resolve(cache.get(ver)!);
+            if (inFlight.has(ver)) return inFlight.get(ver)!;
             const promise = (async () => {
                 try {
-                    const res = await fetch(`${DATA_CDN_BASE}/data/${ver}/region_schema.json`);
+                    const res = await fetch(`${DATA_CDN_BASE}/data/${ver}/${file}`);
                     if (!res.ok) throw new Error(res.statusText);
                     const s = await res.json() as SpacetimeDBSchema;
-                    caches.schemas.set(ver, s);
+                    cache.set(ver, s);
                     return s;
                 } catch (e) {
-                    console.warn("[cereal] Could not load region_schema.json:", e);
-                    caches.schemas.set(ver, null);
+                    console.warn(`[cereal] Could not load ${file} for "${ver}":`, e);
+                    cache.set(ver, null);
                     return null;
                 } finally {
-                    caches.inFlightSchemas.delete(ver);
+                    inFlight.delete(ver);
                 }
             })();
-            caches.inFlightSchemas.set(ver, promise);
+            inFlight.set(ver, promise);
             return promise;
-        });
+        }
+
+        const [schema] = createResource(tagSignal, (ver) =>
+            loadSchemaFile(ver, "region_schema.json", caches.schemas, caches.inFlightSchemas));
+
+        // Not every version has a global schema (older/unpaired ones don't) — null just means
+        // the view degrades to region-only.
+        const [globalSchema] = createResource(tagSignal, (ver) =>
+            loadSchemaFile(ver, "global_schema.json", caches.globalSchemas, caches.inFlightGlobalSchemas));
 
         const settled = () => {
             const m = manifest();
@@ -282,26 +318,19 @@ export const DataProvider: ParentComponent = (props) => {
             },
             ({m, d}): TableIndex[] => {
                 if (!m) return [];
-                return [...m.tables]
+                const inManifest = new Set(m.tables.map((t) => t.name));
+                // Global-only tables aren't in the (region-derived) manifest; add them from the schema.
+                const globalOnly = [...(d?.tables.keys() ?? [])].filter((name) => !inManifest.has(name));
+                return [
+                    ...m.tables.map((slim) => ({name: slim.name, slim})),
+                    ...globalOnly.map((name) => ({name, slim: undefined})),
+                ]
                     .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((slim) => ({name: slim.name, meta: buildResolvedMeta(slim, slim.name, d)}));
+                    .map(({name, slim}) => ({name, meta: buildResolvedMeta(slim, name, d)}));
             },
         );
 
         const [foreignKeys] = createResource(settled, ({m}): ForeignKeyMapping[] => m?.foreignKeys ?? []);
-
-        function getIdxMap(): Map<number, string> | null {
-            const s = schema();
-            if (!s) return null;
-            // Cache by schema identity so the idxMap always matches the schema it pairs with,
-            // even if the resource transiently returns a stale schema during version switches.
-            let map = caches.idxMaps.get(s);
-            if (!map) {
-                map = buildTypeIndexMap(s);
-                caches.idxMaps.set(s, map);
-            }
-            return map;
-        }
 
         /**
          * Schema-derived structural metadata (columns, enums, pk, visibility) for the current
@@ -310,14 +339,39 @@ export const DataProvider: ParentComponent = (props) => {
          * (they re-run once the schema resolves).
          */
         function getDerived(): DerivedSchema | null {
+            // Wait for both schema fetches so tables aren't briefly tagged region-only (and
+            // enums/columns don't flicker) while the global schema is still in flight.
+            if (globalSchema.loading) return null;
             const s = schema();
             if (!s) return null;
-            let d = caches.derived.get(s);
-            if (!d) {
-                d = deriveSchema(s);
-                caches.derived.set(s, d);
+            const g = globalSchema() ?? null;
+            let entry = caches.derived.get(s);
+            if (!entry || entry.global !== g) {
+                entry = {global: g, derived: deriveMergedSchema(s, g)};
+                caches.derived.set(s, entry);
             }
-            return d;
+            return entry.derived;
+        }
+
+        /** The schema that owns `tableName`'s types: region if declared there, else global. */
+        function owningSchema(tableName?: string): SpacetimeDBSchema | null {
+            const r = schema() ?? null;
+            const g = globalSchema() ?? null;
+            if (!tableName) return r ?? g;
+            if (r?.tables?.some((t) => t.name === tableName)) return r;
+            if (g?.tables?.some((t) => t.name === tableName)) return g;
+            return r ?? g;
+        }
+
+        function getIdxMapFor(s: SpacetimeDBSchema): Map<number, string> {
+            // Cache by schema identity so the idxMap always matches the schema it pairs with,
+            // even if a resource transiently returns a stale schema during version switches.
+            let map = caches.idxMaps.get(s);
+            if (!map) {
+                map = buildTypeIndexMap(s);
+                caches.idxMaps.set(s, map);
+            }
+            return map;
         }
 
         /** Merge a slim manifest `TableMeta` with schema-derived structure into a `ResolvedTableMeta`. */
@@ -339,10 +393,14 @@ export const DataProvider: ParentComponent = (props) => {
                 primaryKey: slim?.primaryKey ?? dt?.primaryKey,
                 displayField: slim?.displayField,
                 rowCount: slim?.rowCount ?? 0,
-                isPublic: slim?.isPublic ?? dt?.isPublic ?? true,
+                // Tables with no manifest entry (global-only) have no dumped rows; treat them like
+                // hidden tables so every "can we load rows?" gate (all keyed on isPublic) says no.
+                isPublic: slim ? slim.isPublic : dt?.origin === "global" ? false : (dt?.isPublic ?? true),
                 spriteFields: slim?.spriteFields ?? [],
                 columns: dt?.columns ?? [],
                 enumValues,
+                origin: dt?.origin ?? "region",
+                schemaMismatches: dt?.mismatches,
             };
         }
 
@@ -586,17 +644,17 @@ export const DataProvider: ParentComponent = (props) => {
             getIncomingRefs: (t) => incomingRefsMap().get(t) ?? [],
             getEnum: (name) => getDerived()?.enums.get(name),
             getEnums: () => getDerived()?.enums,
+            isStructureReady: () => getDerived() != null,
             getColumns: (name) => getDerived()?.tables.get(name)?.columns ?? [],
             resolveCurrentTable: (name) => getDerived()?.migration.resolveCurrent(name) ?? name,
             isSupersededTable: (name) => getDerived()?.migration.isSuperseded(name) ?? false,
             getColumnType: (tableName, columnName) => {
-                const s = schema();
+                const s = owningSchema(tableName);
                 return s ? getColumnTypeElement(tableName, columnName, s) : undefined;
             },
-            getTypeContext: () => {
-                const s = schema();
-                const idxMap = getIdxMap();
-                return s && idxMap ? {schema: s, idxMap} : undefined;
+            getTypeContext: (tableName) => {
+                const s = owningSchema(tableName);
+                return s ? {schema: s, idxMap: getIdxMapFor(s)} : undefined;
             },
             getDisplayNames: (name: string) => {
                 caches.displayNameVersion(); // reactive dep
@@ -606,6 +664,7 @@ export const DataProvider: ParentComponent = (props) => {
             getObjectHistory,
             manifest,
             schema,
+            globalSchema,
             searchIndex,
             tag: tagSignal,
         };

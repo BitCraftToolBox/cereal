@@ -11,7 +11,7 @@
  * or the top-level `enums` array — they are all reconstructed from the schema via `deriveSchema`.
  */
 
-import type {AlgebraicType, ProductElement, SpacetimeDBSchema} from "./schema";
+import {type AlgebraicType, buildTypeIndexMap, type ProductElement, type SchemaTable, type SpacetimeDBSchema} from "./schema";
 import {findRefIndexThroughOptionArray, hasArrayThroughOption, unwrapRefOptionArray,} from "./type-walkers";
 
 export interface EnumRegistryEntry {
@@ -242,7 +242,18 @@ export interface DerivedTableStructure {
     /** Enum-typed column path → its variant list. */
     enumVariants: Record<string, string[]>;
     productTypeRef: number;
+    /** Which module schema(s) declare this table. Set by `deriveSchema`/`deriveMergedSchema`. */
+    origin: TableOrigin;
+    /**
+     * Only for `origin === "both"`: human-readable differences between the region and global
+     * declarations (the region declaration is the one reflected in this structure). Empty/absent
+     * when the two are identical.
+     */
+    mismatches?: string[];
 }
+
+/** Which BitCraft module schema a table comes from. */
+export type TableOrigin = "region" | "global" | "both";
 
 export interface DerivedSchema {
     /** table name → structural metadata. */
@@ -289,6 +300,7 @@ export function deriveTablesFromCtx(
             enumColumns,
             enumVariants,
             productTypeRef: schemaTable.product_type_ref,
+            origin: "region",
         });
     }
     return tables;
@@ -307,6 +319,121 @@ export function deriveSchema(schema: SpacetimeDBSchema): DerivedSchema {
     );
     const migration = buildMigrationInfo(tables.keys());
     return {tables, enums, migration, ctx};
+}
+
+/**
+ * Canonical string for a type with every `Ref` expanded (cycle-guarded), so types from two
+ * different typespaces can be compared. Referenced type names are included.
+ */
+function typeSignature(
+    schema: SpacetimeDBSchema,
+    names: Map<number, string>,
+    t: AlgebraicType,
+    seen: number[] = [],
+): string {
+    if (t.Ref !== undefined) {
+        const name = names.get(t.Ref) ?? `#${t.Ref}`;
+        if (seen.includes(t.Ref)) return `<${name}:cycle>`;
+        const target = schema.typespace.types[t.Ref];
+        return `<${name}>${target ? typeSignature(schema, names, target, [...seen, t.Ref]) : "?"}`;
+    }
+    if (t.Product) {
+        return `P{${t.Product.elements.map((e) => `${e.name?.some ?? "?"}:${typeSignature(schema, names, e.algebraic_type, seen)}`).join(",")}}`;
+    }
+    if (t.Sum) {
+        return `S{${t.Sum.variants.map((v) => `${v.name?.some ?? "?"}:${typeSignature(schema, names, v.algebraic_type, seen)}`).join(",")}}`;
+    }
+    if (t.Array) return `A[${typeSignature(schema, names, t.Array, seen)}]`;
+    return Object.keys(t)[0] ?? "?";
+}
+
+/** Describe how a table declared in both schemas differs (empty array = identical). */
+export function diffSchemaTables(
+    regionSchema: SpacetimeDBSchema,
+    regionTable: SchemaTable,
+    globalSchema: SpacetimeDBSchema,
+    globalTable: SchemaTable,
+    regionCtx: SchemaTypeContext = createSchemaTypeContext(regionSchema),
+    globalCtx: SchemaTypeContext = createSchemaTypeContext(globalSchema),
+): string[] {
+    const out: string[] = [];
+    const rNames = buildTypeIndexMap(regionSchema);
+    const gNames = buildTypeIndexMap(globalSchema);
+    const cols = (s: SpacetimeDBSchema, names: Map<number, string>, t: SchemaTable) => {
+        const elements = s.typespace.types[t.product_type_ref]?.Product?.elements ?? [];
+        return new Map(elements.map((e, i) => [
+            e.name?.some ?? `#${i}`,
+            {sig: typeSignature(s, names, e.algebraic_type), type: e.algebraic_type},
+        ] as const));
+    };
+    const rc = cols(regionSchema, rNames, regionTable);
+    const gc = cols(globalSchema, gNames, globalTable);
+    /** Enum variants if the column is (Option/Array/Ref-wrapped) a pure enum, else undefined. */
+    const enumVariants = (ctx: SchemaTypeContext, t: AlgebraicType): string[] | undefined => {
+        const u = ctx.unwrapType(t);
+        return ctx.isEnumType(u) ? ctx.getEnumVariants(u) : undefined;
+    };
+    for (const [name, r] of rc) {
+        const g = gc.get(name);
+        if (!g) {
+            out.push(`column "${name}" only in region`);
+        } else if (g.sig !== r.sig) {
+            const rv = enumVariants(regionCtx, r.type);
+            const gv = enumVariants(globalCtx, g.type);
+            if (rv && gv) {
+                const onlyR = rv.filter((v) => !gv.includes(v));
+                const onlyG = gv.filter((v) => !rv.includes(v));
+                const parts = [
+                    onlyR.length ? `region only: ${onlyR.join(", ")}` : "",
+                    onlyG.length ? `global only: ${onlyG.join(", ")}` : "",
+                ].filter(Boolean);
+                out.push(`column "${name}" enum variants differ (${parts.join("; ") || "variant order differs"})`);
+            } else {
+                out.push(`column "${name}" has a different type`);
+            }
+        }
+    }
+    for (const name of gc.keys()) if (!rc.has(name)) out.push(`column "${name}" only in global`);
+    if (out.length === 0 && [...rc.keys()].join(",") !== [...gc.keys()].join(",")) {
+        out.push("column order differs");
+    }
+    const j = (v: unknown) => JSON.stringify(v ?? null);
+    if (j(regionTable.primary_key) !== j(globalTable.primary_key)) out.push("primary key differs");
+    if (j(regionTable.indexes) !== j(globalTable.indexes)) out.push("indexes differ");
+    if (j(regionTable.constraints) !== j(globalTable.constraints)) out.push("constraints differ");
+    if (j(regionTable.table_access) !== j(globalTable.table_access)) out.push("table access differs");
+    return out;
+}
+
+/**
+ * Merged structural view of the region and global module schemas. A table in both takes its
+ * structure from the region schema (any disagreement is recorded in `mismatches`); enums are
+ * the union, region winning on name collisions. `ctx` is the region context. Use
+ * `deriveSchema(global)` yourself if you need the global type context.
+ */
+export function deriveMergedSchema(region: SpacetimeDBSchema, global: SpacetimeDBSchema | null): DerivedSchema {
+    const base = deriveSchema(region);
+    if (!global) return base;
+
+    const globalDerived = deriveSchema(global);
+    const regionTables = new Map(region.tables.map((t) => [t.name, t] as const));
+    const globalTables = new Map(global.tables.map((t) => [t.name, t] as const));
+
+    const tables = new Map(base.tables);
+    for (const [name, structure] of globalDerived.tables) {
+        const existing = tables.get(name);
+        if (!existing) {
+            tables.set(name, {...structure, origin: "global"});
+            continue;
+        }
+        const mismatches = diffSchemaTables(
+            region, regionTables.get(name)!, global, globalTables.get(name)!, base.ctx, globalDerived.ctx,
+        );
+        tables.set(name, {...existing, origin: "both", ...(mismatches.length ? {mismatches} : {})});
+    }
+
+    const enums = new Map([...globalDerived.enums, ...base.enums]);
+    return {tables, enums, migration: buildMigrationInfo(tables.keys()), ctx: base.ctx};
 }
 
 

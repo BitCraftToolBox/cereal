@@ -108,6 +108,14 @@ jobs:
             echo "Warning: region_schema.json not found in game-data"
           fi
           
+          # Copy global_schema.json (written by the same automata run as region_schema.json)
+          if [ -f "../game-data/global_schema.json" ]; then
+            cp ../game-data/global_schema.json "$TARGET_FOLDER/"
+            echo "Copied global_schema.json to $TARGET_FOLDER/"
+          else
+            echo "Warning: global_schema.json not found in game-data"
+          fi
+
           # Store the target folder for later steps
           echo "target_folder=$TARGET_FOLDER" >> $GITHUB_OUTPUT
 
