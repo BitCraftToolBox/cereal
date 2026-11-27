@@ -289,5 +289,10 @@
     "tag": "2026-11-18",
     "label": "1.0.2 - Hotfixes",
     "description": "Hotfix patch notes.\n\nAggregate patch notes for the week's hotfixes. Includes swimming mounts.\nDon't ask what happened to 1.0.1.\nSteam post: https://store.steampowered.com/news/app/3454650/view/690900570100204097"
+  },
+  {
+    "tag": "2026-11-27",
+    "label": "1.0.3 - Hotfixes",
+    "description": "Hotfix patch notes.\n\nIn-Game News, Performance, Accessibility, and Faster Claim Clearing\nBitcraft news: https://bitcraftonline.com/news/patch-notes-in-game-news-performance-accessibility-and-faster-claim-clearing"
   }
 ]

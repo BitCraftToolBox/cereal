@@ -582,10 +582,13 @@ export function diffVersion(
         fetchable?: (name: string) => boolean;
         enumsA?: Map<string, string[]>;
         enumsB?: Map<string, string[]>;
+        /** Override the table-name universe per side (e.g. manifest + global-only schema tables). */
+        tableNamesA?: Iterable<string>;
+        tableNamesB?: Iterable<string>;
     },
 ): VersionDiff {
-    const fromMig = buildMigrationInfo(a.tables.map((t) => t.name));
-    const toMig = buildMigrationInfo(b.tables.map((t) => t.name));
+    const fromMig = buildMigrationInfo(opts?.tableNamesA ?? a.tables.map((t) => t.name));
+    const toMig = buildMigrationInfo(opts?.tableNamesB ?? b.tables.map((t) => t.name));
 
     const tables: TableEntryDiff[] = [];
     for (const base of new Set([...fromMig.currentByBase.keys(), ...toMig.currentByBase.keys()])) {

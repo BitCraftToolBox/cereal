@@ -51,6 +51,17 @@ export default function VersionCompareView() {
     const schemasReady = () =>
         cmp.fromStore.isStructureReady() && cmp.toStore.isStructureReady();
 
+    // Table-name universe per side: manifest (region, dumped) tables plus global-only tables,
+    // which exist only in the schema. Global-only tables get schema diffs but never row diffs
+    // (rows aren't dumped for them, and every static table is already mirrored to regions).
+    const tableNames = (store: typeof cmp.fromStore, manifest: typeof fromManifest) => {
+        const names = new Set((manifest()?.tables ?? []).map((t) => t.name));
+        if (store.isStructureReady()) for (const n of store.getSchemaTableNames()) names.add(n);
+        return [...names];
+    };
+    const fromTableNames = () => tableNames(cmp.fromStore, fromManifest);
+    const toTableNames = () => tableNames(cmp.toStore, toManifest);
+
     // Logical tables, keyed by migration base: each side contributes its *current* (highest-N)
     // version, so a migrated `_vN` table is paired by base instead of appearing as remove+add.
     // Computed purely from manifest table names (no schema needed) so it's available early.
@@ -58,8 +69,8 @@ export default function VersionCompareView() {
         const a = fromManifest();
         const b = toManifest();
         if (!a || !b || !manifestsMatchSelection()) return [];
-        const fromMig = buildMigrationInfo(a.tables.map((t) => t.name));
-        const toMig = buildMigrationInfo(b.tables.map((t) => t.name));
+        const fromMig = buildMigrationInfo(fromTableNames());
+        const toMig = buildMigrationInfo(toTableNames());
         const bases = new Set([...fromMig.currentByBase.keys(), ...toMig.currentByBase.keys()]);
         return [...bases].map((base) => ({
             base,
@@ -70,21 +81,21 @@ export default function VersionCompareView() {
 
     const fetchable = (name: string) => {
         const m = manifestMeta(name);
-        return isStaticTable(name) && m?.hasRows;
+        return isStaticTable(name) && m?.isPublic;
     };
 
     // Row-level diffs are only valid when *both* sides can actually be fetched.
     const pairFetchable = (fromName: string, toName: string) => {
         const fromMeta = fromTableMetaByName().get(fromName);
         const toMeta = toTableMetaByName().get(toName);
-        const canFrom = fromMeta != null && isStaticTable(fromName) && fromMeta.hasRows;
-        const canTo = toMeta != null && isStaticTable(toName) && toMeta.hasRows;
+        const canFrom = fromMeta != null && isStaticTable(fromName) && fromMeta.isPublic;
+        const canTo = toMeta != null && isStaticTable(toName) && toMeta.isPublic;
         return canFrom && canTo;
     };
 
     const singleFetchable = (name: string, side: "from" | "to") => {
         const meta = side === "from" ? fromTableMetaByName().get(name) : toTableMetaByName().get(name);
-        return meta != null && isStaticTable(name) && meta.hasRows;
+        return meta != null && isStaticTable(name) && meta.isPublic;
     };
 
     // Column add/remove counts, sourced from the schema-derived column lists (both schemas
@@ -203,6 +214,8 @@ export default function VersionCompareView() {
             rowDeltas: matchingRowDeltas,
             schemaChanges: schemaChanges(),
             fetchable,
+            tableNamesA: fromTableNames(),
+            tableNamesB: toTableNames(),
             enumsA: cmp.fromStore.getEnums(),
             enumsB: cmp.toStore.getEnums(),
         });
@@ -217,6 +230,11 @@ export default function VersionCompareView() {
         changed: "text-yellow-600 dark:text-yellow-400",
     };
     const kindSign: Record<DiffKind, string> = {added: "+", removed: "−", changed: "~"};
+
+    // Access per the schema (not whether rows were dumped): public global-only tables have no
+    // rows to fetch but aren't private.
+    const isPrivate = (name: string) =>
+        !(cmp.toStore.getTableMeta(name) ?? cmp.fromStore.getTableMeta(name))?.isPublic;
 
     const tableHref = (name: string) =>
         `/compare/${name}?from=${cmp.fromTag()}&to=${cmp.toTag()}`;
@@ -288,7 +306,7 @@ export default function VersionCompareView() {
                                             </Show>
                                             <Show when={!t.fetchable}>
                                                 <span class="text-xs text-text-muted">
-                                                    {isStaticTable(t.name) ? "🔒" : "⚙️"}
+                                                    {!isStaticTable(t.name) ? "⚙️" : isPrivate(t.name) ? "🔒" : "global"}
                                                 </span>
                                             </Show>
                                         </A>

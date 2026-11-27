@@ -69,6 +69,8 @@ export interface DataStore {
     isStructureReady: () => boolean;
     /** Schema-derived top-level column names for a table (empty if schema not yet loaded). */
     getColumns: (tableName: string) => string[];
+    /** Names of every table declared by the region and/or global schema (empty until loaded). */
+    getSchemaTableNames: () => string[];
     /**
      * Resolve a table name to the current version of its migration base (e.g. `deployable_desc`
      * → `deployable_desc_v3` when that's the highest version present). Identity until the schema
@@ -649,6 +651,7 @@ export const DataProvider: ParentComponent = (props) => {
             getEnums: () => getDerived()?.enums,
             isStructureReady: () => getDerived() != null,
             getColumns: (name) => getDerived()?.tables.get(name)?.columns ?? [],
+            getSchemaTableNames: () => [...(getDerived()?.tables.keys() ?? [])],
             resolveCurrentTable: (name) => getDerived()?.migration.resolveCurrent(name) ?? name,
             isSupersededTable: (name) => getDerived()?.migration.isSuperseded(name) ?? false,
             getColumnType: (tableName, columnName) => {
